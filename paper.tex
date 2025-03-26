@@ -466,7 +466,8 @@ Therefore, as a feasibility metric, an implementation in QEMU is ideal in our ci
 
 \section{Related Work}
 
-Several alternate approaches have been developed over the years for fine-grained isolation involving hardware-assisted techniques. Some systems have proposed extensions to the page table metadata such as Donky \cite{Donky}, whi
+Our work on HFI for RSIC-V builds on prior work that established HFI for x86-64 architectures \cite{HFI}. 
+There are also several alternate approaches have been developed over the years for fine-grained isolation involving hardware-assisted techniques. Some systems have proposed extensions to the page table metadata to store a per-sandbox ID checked by hardware, such as Donky \cite{Donky} or IMIX \cite{IMIX}. Donky has been implemented for both x86 and RISC-V architectures, while IMIX has only been implemented on x86. In addition to this, there are also methods that make use of capability-based addressing, a m, which is seen most prominently in Cheri \cite{CHERI}, which has been implemented for RISC-V. While Cheri is a strong security model, it requires extensive modification of the software, and hardware including the OS, ABI, and compiler.
 
 % conference papers do not normally have an appendix
 
@@ -526,6 +527,9 @@ in an Age of Risk. SIGARCH Comput. Archit. News 42, 3 (2014). https:
 //doi.org/10.1145/2678373.2665740
 
 \bibitem{IMIX}
+Tommaso Frassetto, Patrick Jauernig, Christopher Liebchen, and Ahmad-Reza
+Sadeghi. 2018. IMIX:In-Process Memory Isolation EXtension. In Proceedings of
+the USENIX Security Symposium (USENIX Security).
 
 \end{thebibliography}
 
