@@ -347,7 +347,7 @@ dineshkeserla@utexas.edu}
 \IEEEauthorblockA{University of Texas at Austin\\
 devpatel199@utexas.edu}
 \and
-\IEEEauthorblockN{Joseph Stanley}
+\IEEEauthorblockN{Joseph Stanley (jps4455)}
 \IEEEauthorblockA{University of Texas at Austin\\
 stanley.p.joseph@gmail.com}}
 
@@ -464,7 +464,9 @@ A more comprehensive implementation for security and performance in addition to 
 However, such an implementation is comparatively much slower to QEMU in modification of the libraries and execution. 
 Therefore, as a feasibility metric, an implementation in QEMU is ideal in our circumstances.
 
+\section{Related Work}
 
+Several alternate approaches have been developed over the years for fine-grained isolation involving hardware-assisted techniques. Some systems have proposed extensions to the page table metadata such as Donky \cite{Donky}, whi
 
 % conference papers do not normally have an appendix
 
@@ -510,6 +512,20 @@ Therefore, as a feasibility metric, an implementation in QEMU is ideal in our ci
 
 \bibitem{HFI}
 Shravan Narayan, Tal Garfinkel, Mohammadkazem Taram, Joey Rudek, Daniel Moghimi, Evan Johnson, Chris Fallin, Anjo Vahldiek-Oberwagner, Michael LeMay, Ravi Sahita, Dean Tullsen, and Deian Stefan. 2023. Going beyond the Limits of SFI: Flexible and Secure Hardware-Assisted In-Process Isolation with HFI. In Proceedings of the 28th ACM International Conference on Architectural Support for Programming Languages and Operating Systems, Volume 3 (ASPLOS 2023). Association for Computing Machinery, New York, NY, USA, 266–281. https://doi.org/10.1145/3582016.3582023
+
+\bibitem{Donky}
+David Schrammel, Samuel Weiser, Stefan Steinegger, Martin Schwarzl, Michael
+Schwarz, Stefan Mangard, and Daniel Gruss. 2020. Donky: Domain Keys–Efficient
+In-Process Isolation for RISC-V and x86. In Proceedings of the USENIX Security
+Symposium (USENIX Security).
+
+\bibitem{CHERI}
+Jonathan Woodruff, Robert N.M. Watson, David Chisnall, Simon W. Moore,
+Jonathan Anderson, Brooks Davis, Ben Laurie, Peter G. Neumann, Robert Norton, and Michael Roe. 2014. The CHERI Capability Model: Revisiting RISC
+in an Age of Risk. SIGARCH Comput. Archit. News 42, 3 (2014). https:
+//doi.org/10.1145/2678373.2665740
+
+\bibitem{IMIX}
 
 \end{thebibliography}
 
