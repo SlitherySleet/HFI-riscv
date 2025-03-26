@@ -464,9 +464,15 @@ A more comprehensive implementation for security and performance in addition to 
 However, such an implementation is comparatively much slower to QEMU in modification of the libraries and execution. 
 Therefore, as a feasibility metric, an implementation in QEMU is ideal in our circumstances.
 
-\section{Related Work}
 
+\subsection{Current Progress}
+As of the writing of this paper, we have begun a simple modification to the existing RISC-V in QEMU.
+Our work has started by creating a basic internal register called \textit{hfi\_status}, which serves as a flag bit for verifying whether HFI can be toggled on or off via our newly implemented instructions.
+
+
+\section{Related Work}
 Several alternate approaches have been developed over the years for fine-grained isolation involving hardware-assisted techniques. Some systems have proposed extensions to the page table metadata such as Donky \cite{Donky}, whi
+
 
 % conference papers do not normally have an appendix
 
