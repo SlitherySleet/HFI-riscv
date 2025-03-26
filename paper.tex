@@ -478,7 +478,10 @@ We are then able to differentiate between the two functions by modifying the fun
 For now, our implementation of the instructions is that they do not accept any parameters and output no values. 
 
 \subsection{Next Steps}
-
+Our next course of action is modifying the instructions to properly implement HFI regions and support for modification of these regions.
+More specifically we will need to create the relevant registers for the regions, update the existing instructions to handle HFI initialization, and create new instructions for managing the regions.
+In addition, during sandboxing, we will need to check with the regions to verify memory accesses in accordance with HFI.
+Moreover, we will need to create new tests to validate the HFI implementation in the various cases as regions are introduced to ensure sandboxing is active as necessary.
 
 \section{Related Work}
 Several alternate approaches have been developed over the years for fine-grained isolation involving hardware-assisted techniques. Some systems have proposed extensions to the page table metadata such as Donky \cite{Donky}, whi
