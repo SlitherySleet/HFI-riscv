@@ -429,12 +429,12 @@ Software-only isolation has proven susceptible to exploits that take advantage o
 
 In contrast, a hardware-assisted approach can unify bounds checking and control-flow constraints at the processor level, closing off out-of-bounds reads or writes before they ever reach caches or translation lookaside buffers. Furthermore, hardware-based mediation of system calls—critical for sandboxing unmodified native libraries—promises to eliminate entire classes of bypass vulnerabilities.
 
-Beyond security, performance remains a central issue. Current software-based guard-page or compiler-instrumented approaches can incur 20–40\% runtime overhead on CPU-intensive code, and ephemeral workloads (common in serverless contexts) may pay a high cost to instantiate and tear down per-sandbox memory. Typical solutions (e.g., mprotect, madvise) require system calls and TLB shootdowns that do not scale gracefully.
+Beyond security, performance remains a central issue. Current software-based guard-page or compiler-instrumented approaches can incur 20-40\% runtime overhead on CPU-intensive code, and ephemeral workloads (common in serverless contexts) may pay a high cost to instantiate and tear down per-sandbox memory. Typical solutions (e.g., mprotect, madvise) require system calls and TLB shootdowns that do not scale gracefully.
 
 On RISC-V, these overheads become particularly relevant for microcontroller-class devices—where every cycle matters—and for large-scale data centers wanting to isolate thousands of workloads concurrently. As prior experiments with x86-based HFI show, carefully designed hardware instructions can reduce context-switch time to near that of a function call, while supporting user-space mechanisms for setting up sandbox memory regions. The challenge is thus to replicate and refine these ideas in a clean-slate RISC-V setting without compromising security or drastically altering the instruction set.
 
 \subsection{Approach}
-Our work brings HFI concepts to the RISC-V ecosystem by introducing new “region”-based memory restrictions, a dedicated sandbox mode, and fast transition instructions—all while fitting into RISC-V's existing privileged architecture. Specifically, we rely on the following techniques:
+Our work brings HFI concepts to the RISC-V ecosystem by introducing new "region"-based memory restrictions, a dedicated sandbox mode, and fast transition instructions—all while fitting into RISC-V's existing privileged architecture. Specifically, we rely on the following techniques:
 \begin{enumerate}
     \item In-Process Isolation via Regions. Inspired by previous x86-64 prototypes, the processor tracks a small set of metadata registers—each defining accessible addresses and permissions for code or data. When enabled, any out-of-bounds access or forbidden system call triggers an immediate trap, ensuring robust isolation. These hardware-enforced bounds checks happen in parallel with memory lookups.
     \item Lightweight Sandbox Mode. A single hfi\_enter instruction enables isolation, while hfi\_exit disables it. Each sandbox can optionally redirect system calls, enabling complete interposition if the sandbox is untrusted. The overhead of enter/exit can be on the order of tens of cycles, much lower than classical kernel-based context switches.
@@ -460,14 +460,24 @@ QEMU lacks support for simulating microarchitectural features such as branch pre
 Therefore, it should be noted that we do implement the serialization on transition instructions to protect against speculative execution outside of the sandbox, an implementation in QEMU will not be able to verify the side-channel resistance. 
 Additionally, verfiying performance is problematic as QEMU does not have proper features for verifying cycles.
 
-A more comprehensive implementation for security and performance in addition to ISA semantics can be considered in gem5 as done in the original HFI paper \cite{HFI}. 
+A more comprehensive implementation for evaluation of security and performance in addition to ISA semantics can be considered in gem5 as done in the original HFI paper \cite{HFI}. 
 However, such an implementation is comparatively much slower to QEMU in modification of the libraries and execution. 
 Therefore, as a feasibility metric, an implementation in QEMU is ideal in our circumstances.
 
 
 \subsection{Current Progress}
-As of the writing of this paper, we have begun a simple modification to the existing RISC-V in QEMU.
+As of the writing of this paper, we have begun a simple modification to the existing RISC-V implementation in QEMU.
 Our work has started by creating a basic internal register called \textit{hfi\_status}, which serves as a flag bit for verifying whether HFI can be toggled on or off via our newly implemented instructions.
+Through the use of QEMU logging we display the value of \textit{hfi\_status} and use it as a validator that the instructions have run.
+
+For our first instruction, we have \textit{hfi\_enter}, which sets \textit{hfi\_status} $=1$ when executed. 
+Additionally, we have \textit{hfi\_exit}, which sets \textit{hfi\_status} $=0$.
+RISC-V contains unmapped opcodes that can be used for the additional of new instructions.
+In order to implement our instruction we have opted to use the CUSTOM0 opcode which is $0001011$.
+We are then able to differentiate between the two functions by modifying the funct3 value of the instructions such that \textit{hfi\_enter} has funct3 $= 000$ and \textit{hfi\_enter} has funct3 $= 001$.
+For now, our implementation of the instructions is that they do not accept any parameters and output no values. 
+
+\subsection{Next Steps}
 
 
 \section{Related Work}
@@ -517,11 +527,11 @@ Several alternate approaches have been developed over the years for fine-grained
 \begin{thebibliography}{1}
 
 \bibitem{HFI}
-Shravan Narayan, Tal Garfinkel, Mohammadkazem Taram, Joey Rudek, Daniel Moghimi, Evan Johnson, Chris Fallin, Anjo Vahldiek-Oberwagner, Michael LeMay, Ravi Sahita, Dean Tullsen, and Deian Stefan. 2023. Going beyond the Limits of SFI: Flexible and Secure Hardware-Assisted In-Process Isolation with HFI. In Proceedings of the 28th ACM International Conference on Architectural Support for Programming Languages and Operating Systems, Volume 3 (ASPLOS 2023). Association for Computing Machinery, New York, NY, USA, 266–281. https://doi.org/10.1145/3582016.3582023
+Shravan Narayan, Tal Garfinkel, Mohammadkazem Taram, Joey Rudek, Daniel Moghimi, Evan Johnson, Chris Fallin, Anjo Vahldiek-Oberwagner, Michael LeMay, Ravi Sahita, Dean Tullsen, and Deian Stefan. 2023. Going beyond the Limits of SFI: Flexible and Secure Hardware-Assisted In-Process Isolation with HFI. In Proceedings of the 28th ACM International Conference on Architectural Support for Programming Languages and Operating Systems, Volume 3 (ASPLOS 2023). Association for Computing Machinery, New York, NY, USA, 266-281. https://doi.org/10.1145/3582016.3582023
 
 \bibitem{Donky}
 David Schrammel, Samuel Weiser, Stefan Steinegger, Martin Schwarzl, Michael
-Schwarz, Stefan Mangard, and Daniel Gruss. 2020. Donky: Domain Keys–Efficient
+Schwarz, Stefan Mangard, and Daniel Gruss. 2020. Donky: Domain Keys-Efficient
 In-Process Isolation for RISC-V and x86. In Proceedings of the USENIX Security
 Symposium (USENIX Security).
 
