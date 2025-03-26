@@ -413,14 +413,14 @@ stanley.p.joseph@gmail.com}}
 \section{Introduction}
 
 \subsection{Project Goals}
-Hardware-assisted fault isolation (HFI) on RISC-V aims to address two critical needs in modern computing systems: preventing security bugs by isolating untrusted or risky code, and better understanding (and improving) performance overheads that arise from current software-based or OS-based sandboxing mechanisms. By offering a minimal set of architectural extensions for in-process isolation, HFI empowers developers to sandbox components (e.g., libraries, plugins, user-defined functions) without resorting to heavyweight processes or virtual machines. Ultimately, the project’s goal is to demonstrate a secure yet performant solution that seamlessly integrates into existing RISC-V designs.
+Hardware-assisted fault isolation (HFI) on RISC-V aims to address two critical needs in modern computing systems: preventing security bugs by isolating untrusted or risky code, and better understanding (and improving) performance overheads that arise from current software-based or OS-based sandboxing mechanisms. By offering a minimal set of architectural extensions for in-process isolation, HFI empowers developers to sandbox components (e.g., libraries, plugins, user-defined functions) without resorting to heavyweight processes or virtual machines. Ultimately, the project's goal is to demonstrate a secure yet performant solution that seamlessly integrates into existing RISC-V designs.
 
 Several recent high-profile vulnerabilities—such as Heartbleed (CVE-2014-0160) and Spectre (CVE-2017-5753, CVE-2017-5715)—underscore the need for stronger isolation between mutually distrusting code modules. System architects and software developers alike have turned to hardware features for efficient compartmentalization. In this spirit, our HFI design for RISC-V builds on prior work that introduced HFI for x86-64 architectures, enabling fast transitions into and out of “sandbox” contexts while enforcing strong data and control-flow checks.
 
 \subsection{Background}
-Although hardware-based isolation solutions can be integrated at multiple levels, our approach focuses on tightening the security of low-level software runtimes responsible for loading, executing, and managing untrusted or semi-trusted code within the same process. Concretely, existing in-process isolation techniques—such as WebAssembly-based solutions—often rely on software-based guard pages or software fault isolation (SFI). These approaches can impose substantial memory footprints and performance overheads, particularly in tight loops or heavily sandboxed server-side environments. Moreover, software guard pages require complex interactions with the operating system’s memory manager (e.g., mprotect calls) that slow down sandbox creation or resizing.
+Although hardware-based isolation solutions can be integrated at multiple levels, our approach focuses on tightening the security of low-level software runtimes responsible for loading, executing, and managing untrusted or semi-trusted code within the same process. Concretely, existing in-process isolation techniques—such as WebAssembly-based solutions—often rely on software-based guard pages or software fault isolation (SFI). These approaches can impose substantial memory footprints and performance overheads, particularly in tight loops or heavily sandboxed server-side environments. Moreover, software guard pages require complex interactions with the operating system's memory manager (e.g., mprotect calls) that slow down sandbox creation or resizing.
 
-Recent SFI approaches, including WebAssembly’s use of guard regions and JIT-based SFI schemes, have shown that in-process isolation is viable but remains limited by performance bottlenecks and compatibility issues. For instance, large FaaS (Function-as-a-Service) platforms and browser engines isolate tens of thousands of small code modules, resulting in high context-switch overheads or inordinate virtual-address consumption. By consolidating and standardizing architectural support for these needs, HFI reduces reliance on kernel calls, shrinks the required memory footprint, and helps unify existing SFI-based runtimes under a lightweight, hardware-managed sandboxing mechanism.
+Recent SFI approaches, including WebAssembly's use of guard regions and JIT-based SFI schemes, have shown that in-process isolation is viable but remains limited by performance bottlenecks and compatibility issues. For instance, large FaaS (Function-as-a-Service) platforms and browser engines isolate tens of thousands of small code modules, resulting in high context-switch overheads or inordinate virtual-address consumption. By consolidating and standardizing architectural support for these needs, HFI reduces reliance on kernel calls, shrinks the required memory footprint, and helps unify existing SFI-based runtimes under a lightweight, hardware-managed sandboxing mechanism.
 
 % TODO add stuff about risc-v and qemu
 
@@ -434,7 +434,7 @@ Beyond security, performance remains a central issue. Current software-based gua
 On RISC-V, these overheads become particularly relevant for microcontroller-class devices—where every cycle matters—and for large-scale data centers wanting to isolate thousands of workloads concurrently. As prior experiments with x86-based HFI show, carefully designed hardware instructions can reduce context-switch time to near that of a function call, while supporting user-space mechanisms for setting up sandbox memory regions. The challenge is thus to replicate and refine these ideas in a clean-slate RISC-V setting without compromising security or drastically altering the instruction set.
 
 \subsection{Approach}
-Our work brings HFI concepts to the RISC-V ecosystem by introducing new “region”-based memory restrictions, a dedicated sandbox mode, and fast transition instructions—all while fitting into RISC-V’s existing privileged architecture. Specifically, we rely on the following techniques:
+Our work brings HFI concepts to the RISC-V ecosystem by introducing new “region”-based memory restrictions, a dedicated sandbox mode, and fast transition instructions—all while fitting into RISC-V's existing privileged architecture. Specifically, we rely on the following techniques:
 \begin{enumerate}
     \item In-Process Isolation via Regions. Inspired by previous x86-64 prototypes, the processor tracks a small set of metadata registers—each defining accessible addresses and permissions for code or data. When enabled, any out-of-bounds access or forbidden system call triggers an immediate trap, ensuring robust isolation. These hardware-enforced bounds checks happen in parallel with memory lookups.
     \item Lightweight Sandbox Mode. A single hfi\_enter instruction enables isolation, while hfi\_exit disables it. Each sandbox can optionally redirect system calls, enabling complete interposition if the sandbox is untrusted. The overhead of enter/exit can be on the order of tens of cycles, much lower than classical kernel-based context switches.
@@ -443,12 +443,26 @@ Our work brings HFI concepts to the RISC-V ecosystem by introducing new “regio
 \end{enumerate}
 
 
-As demonstrated in prior x86 implementations \cite{HFI}, HFI’s hardware cost is kept minimal, and the main processor pipelines remain largely untouched. This ensures that non-sandboxed code experiences negligible slowdowns, while sandboxed code reaps a significant performance advantage compared to purely software-based solutions.
+As demonstrated in prior x86 implementations \cite{HFI}, HFI's hardware cost is kept minimal, and the main processor pipelines remain largely untouched. This ensures that non-sandboxed code experiences negligible slowdowns, while sandboxed code reaps a significant performance advantage compared to purely software-based solutions.
 
 By systematically combining these hardware instructions, metadata registers, and user-space management strategies, our approach aims to preserve the security guarantees demanded by modern sandboxing frameworks, while also reducing overheads that historically have hindered fine-grained in-process isolation.
 
 
 \section{Progress}
+
+\subsection{Implementation}
+The implementation for HFI in RISC-V is being carried out via Quick Emulator (QEMU). 
+QEMU allows for modifying the semantics to add necessary HFI registers and instructions, allowing for validating HFI's ISA semantics and control-flow traps. 
+Moreover, by implementing in QEMU, RISC-V binaries using the created HFI instructions can be verified for functional correctness.
+
+Unfortunately, this implementation is without problems. 
+QEMU lacks support for simulating microarchitectural features such as branch predictors, speculative execution, cache timing, TLB state, and more.
+Therefore, it should be noted that we do implement the serialization on transition instructions to protect against speculative execution outside of the sandbox, an implementation in QEMU will not be able to verify the side-channel resistance. 
+Additionally, verfiying performance is problematic as QEMU does not have proper features for verifying cycles.
+
+A more comprehensive implementation for security and performance in addition to ISA semantics can be considered in gem5 as done in the original HFI paper \cite{HFI}. 
+However, such an implementation is comparatively much slower to QEMU in modification of the libraries and execution. 
+Therefore, as a feasibility metric, an implementation in QEMU is ideal in our circumstances.
 
 
 
