@@ -389,9 +389,9 @@ stanley.p.joseph@gmail.com}}
 
 % As a general rule, do not put math, special symbols or citations
 % in the abstract
-\begin{abstract}
+% \begin{abstract}
 % TODO
-\end{abstract}
+% \end{abstract}
 
 % no keywords
 
@@ -420,7 +420,7 @@ Several recent high-profile vulnerabilities—such as Heartbleed (CVE-2014-0160)
 \subsection{Background}
 Although hardware-based isolation solutions can be integrated at multiple levels, our approach focuses on tightening the security of low-level software runtimes responsible for loading, executing, and managing untrusted or semi-trusted code within the same process. Concretely, existing in-process isolation techniques—such as WebAssembly-based solutions—often rely on software-based guard pages or software fault isolation (SFI). These approaches can impose substantial memory footprints and performance overheads, particularly in tight loops or heavily sandboxed server-side environments. Moreover, software guard pages require complex interactions with the operating system's memory manager (e.g., mprotect calls) that slow down sandbox creation or resizing.
 
-Recent SFI approaches, including WebAssembly's use of guard regions and JIT-based SFI schemes, have shown that in-process isolation is viable but remains limited by performance bottlenecks and compatibility issues. For instance, large FaaS (Function-as-a-Service) platforms and browser engines isolate tens of thousands of small code modules, resulting in high context-switch overheads or inordinate virtual-address consumption. By consolidating and standardizing architectural support for these needs, HFI reduces reliance on kernel calls, shrinks the required memory footprint, and helps unify existing SFI-based runtimes under a lightweight, hardware-managed sandboxing mechanism.
+Recent SFI approaches, including WebAssembly's use of guard regions and JIT-based SFI schemes, have shown that in-process isolation is viable but remains limited by performance bottlenecks and compatibility issues. For instance, large FaaS (Function-as-a-Service) platforms and browser engines isolate tens of thousands of small code modules, resulting in high context-switch overheads or inordinate virtual-address consumption. To address these issues, Hardware-assisted Fault Isolation (HFI)\cite{HFI} was introduced. By consolidating and standardizing architectural support for these needs, HFI reduces reliance on kernel calls, shrinks the required memory footprint, and helps unify existing SFI-based runtimes under a lightweight, hardware-managed sandboxing mechanism.
 
 % TODO add stuff about risc-v and qemu
 
