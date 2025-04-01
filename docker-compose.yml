@@ -1,0 +1,9 @@
+services:
+  riscv-dev:
+    build: .
+    container_name: riscv_dev
+    volumes:
+      - ./tests:/work/tests
+    working_dir: /work/tests
+    stdin_open: true
+    tty: true
