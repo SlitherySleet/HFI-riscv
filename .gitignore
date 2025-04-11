@@ -5,3 +5,7 @@ paper.fdb_latexmk
 paper.synctex.gz
 paper.pdf
 .DS_Store
+/misc
+qemu-system-riscv64
+tests/*.elf
+tests/output
