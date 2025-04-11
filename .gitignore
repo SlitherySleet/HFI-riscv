@@ -7,4 +7,5 @@ paper.pdf
 .DS_Store
 /misc
 qemu-system-riscv64
+tests/*.elf
 tests/output
