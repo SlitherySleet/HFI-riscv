@@ -1,3 +1,5 @@
+.include "hfi_macros.s"
+
 .section .text
 .global _start
 
@@ -7,6 +9,4 @@ _start:
     add a2, a0, a1       # a2 = 0x3333
     
     # Exit from QEMU
-    li t0, 0x100000       # Load MMIO address of test finisher into t0
-    li t1, 0x5555         # Load the shutdown signal value into t1
-    sw t1, 0(t0)          # Store the value at the MMIO address
+    exit
