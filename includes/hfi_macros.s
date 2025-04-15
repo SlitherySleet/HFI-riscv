@@ -33,28 +33,51 @@
 .set t5,  30
 .set t6,  31
 
-/* Macro: hfi_enter <reg> (reg = rs1, source of exit_handler) */
-.macro hfi_enter reg
-    .set opcode, 0x0B        /* custom-0 */
-    .set funct3, 0
-    .set funct7, 0
-    .set rd, 0
-    .set rs1, \reg
-    .set rs2, 0
-    .word (funct7 << 25) | (rs2 << 20) | (rs1 << 15) | (funct3 << 12) | (rd << 7) | opcode
+/* Macro: hfi_enter rs1 (exit handler in rs1) */
+.macro hfi_enter rs1
+    .set opcode_hfi, 0x0B
+    .set funct3_hfi, 0
+    .set funct7_hfi, 0
+    .set rd_hfi, 0
+    .set rs1_hfi, \rs1
+    .set rs2_hfi, 0
+    .word (funct7_hfi << 25) | (rs2_hfi << 20) | (rs1_hfi << 15) | (funct3_hfi << 12) | (rd_hfi << 7) | opcode_hfi
 .endm
 
 /* Macro: hfi_exit (no operands) */
 .macro hfi_exit
-    .set opcode, 0x0B
-    .set funct3, 1
-    .set funct7, 0
-    .set rd, 0
-    .set rs1, 0
-    .set rs2, 0
-    .word (funct7 << 25) | (rs2 << 20) | (rs1 << 15) | (funct3 << 12) | (rd << 7) | opcode
+    .set opcode_hfi, 0x0B
+    .set funct3_hfi, 1
+    .set funct7_hfi, 0
+    .set rd_hfi, 0
+    .set rs1_hfi, 0
+    .set rs2_hfi, 0
+    .word (funct7_hfi << 25) | (rs2_hfi << 20) | (rs1_hfi << 15) | (funct3_hfi << 12) | (rd_hfi << 7) | opcode_hfi
 .endm
 
+/* Macro: hfi_set_region_size rd (region number), rs1 (base), rs2 (mask/bound) */
+.macro hfi_set_region_size rd, rs1, rs2
+    .set opcode_hfi, 0x0B
+    .set funct3_hfi, 2
+    .set funct7_hfi, 0
+    .set rd_hfi, \rd
+    .set rs1_hfi, \rs1
+    .set rs2_hfi, \rs2
+    .word (funct7_hfi << 25) | (rs2_hfi << 20) | (rs1_hfi << 15) | (funct3_hfi << 12) | (rd_hfi << 7) | opcode_hfi
+.endm
+
+/* Macro: hfi_set_region_permissions rs1 (region set), rs2 (perm byte) */
+.macro hfi_set_region_permissions rs1, rs2
+    .set opcode_hfi, 0x0B
+    .set funct3_hfi, 3
+    .set funct7_hfi, 0
+    .set rd_hfi, 0
+    .set rs1_hfi, \rs1
+    .set rs2_hfi, \rs2
+    .word (funct7_hfi << 25) | (rs2_hfi << 20) | (rs1_hfi << 15) | (funct3_hfi << 12) | (rd_hfi << 7) | opcode_hfi
+.endm
+
+/* Macro: exit — MMIO test finisher shutdown */
 .macro exit
     li t0, 0x100000
     li t1, 0x5555
