@@ -18,8 +18,9 @@ _start:
     hfi_set_region_permissions a2, a3
 
     # 3. Enter sandbox mode (hfi_enter) with dummy exit handler address
-    li a4, 0xdeadbeef       # dummy exit handler
-    hfi_enter a4
+    li a4, 2       # region implicit
+    li a5, 0xdeadbeef       # dummy exit handler
+    hfi_enter a4, a5
 
     # 4. Read something to make sure we didn't crash
     nop                     # should execute normally

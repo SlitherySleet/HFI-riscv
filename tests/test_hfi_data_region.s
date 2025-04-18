@@ -23,8 +23,9 @@ _start:
     hfi_set_region_permissions a6, a7
 
     # --- Enter Sandbox ---
-    li t0, 0xfeedfeed
-    hfi_enter t0
+    li t0, 2
+    li t1, 0xfeedfeed
+    hfi_enter t0, t1
 
     # --- Access valid data memory ---
     li t1, 0x80001000       # address inside data region

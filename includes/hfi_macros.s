@@ -34,13 +34,13 @@
 .set t6,  31
 
 /* Macro: hfi_enter rs1 (exit handler in rs1) */
-.macro hfi_enter rs1
+.macro hfi_enter rs1, rs2
     .set opcode_hfi, 0x0B
     .set funct3_hfi, 0
     .set funct7_hfi, 0
     .set rd_hfi, 0
     .set rs1_hfi, \rs1
-    .set rs2_hfi, 0
+    .set rs2_hfi, \rs2
     .word (funct7_hfi << 25) | (rs2_hfi << 20) | (rs1_hfi << 15) | (funct3_hfi << 12) | (rd_hfi << 7) | opcode_hfi
 .endm
 
