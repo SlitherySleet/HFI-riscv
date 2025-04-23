@@ -6,7 +6,7 @@
 _start:
     # --- Setup Code Region (region 2) ---
     li a0, 0x80000000       # base = start of .text
-    li a1, 0xfffff000       # 4K mask
+    li a1, 0xfffff000       # 4K mask (for implicit region)
     li a2, 2                # region 2 = code
     hfi_set_region_size a2, a0, a1
 
@@ -15,7 +15,7 @@ _start:
 
     # --- Setup Data Region (region 0) for explicit access ---
     li a4, 0x80002000       # base for explicit region 0
-    li a5, 0xfffff000       # 4K mask
+    li a5, 0x1000           # 4K boundary (size of region)
     li a6, 0                # region 0 = explicit region
     hfi_set_region_size a6, a4, a5
 
@@ -54,6 +54,19 @@ _start:
     li t1, 0xABCD12345678    # test value
     hsd0 t1, 16, t0          # Store doubleword to region 0
     hld0 s3, 16, t0          # Load doubleword from region 0
+    
+    # --- Test Boundary Violation Case ---
+    # Access that starts inside region but extends beyond it
+    # Region is 4K (0x1000 bytes), so boundary is at 0x80003000
+    li t0, 0x80002FFE        # 2 bytes before the end of the region
+    
+    # This store should succeed - 2 byte halfword access starting at 0x80002FFE
+    # extends to 0x80002FFF which is still within the region
+    hsh0 t1, 0, t0           # Store halfword - should succeed
+    
+    # This store should fail - 4 byte word access starting at 0x80002FFE
+    # extends to 0x80003001 which is outside the region
+    hsw0 t1, 0, t0           # Store word - should trigger violation
     
     # --- Perform a simple computation with loaded values ---
     add s4, t2, t4            # Add loaded byte and halfword
