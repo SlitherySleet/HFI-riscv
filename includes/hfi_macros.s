@@ -83,3 +83,71 @@
     li t1, 0x5555
     sw t1, 0(t0)
 .endm
+
+/* External region 0 load instructions */
+.macro hlb0 rd, offset, rs1
+    .set opcode_hfi_load, 0x2B
+    .set funct3_hlb0, 0
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs1 << 15) | (funct3_hlb0 << 12) | (\rd << 7) | opcode_hfi_load | ((\offset & 0x1F) << 20)
+.endm
+
+.macro hlh0 rd, offset, rs1
+    .set opcode_hfi_load, 0x2B
+    .set funct3_hlh0, 1
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs1 << 15) | (funct3_hlh0 << 12) | (\rd << 7) | opcode_hfi_load | ((\offset & 0x1F) << 20)
+.endm
+
+.macro hlw0 rd, offset, rs1
+    .set opcode_hfi_load, 0x2B
+    .set funct3_hlw0, 2
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs1 << 15) | (funct3_hlw0 << 12) | (\rd << 7) | opcode_hfi_load | ((\offset & 0x1F) << 20)
+.endm
+
+.macro hld0 rd, offset, rs1
+    .set opcode_hfi_load, 0x2B
+    .set funct3_hld0, 3
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs1 << 15) | (funct3_hld0 << 12) | (\rd << 7) | opcode_hfi_load | ((\offset & 0x1F) << 20)
+.endm
+
+.macro hlbu0 rd, offset, rs1
+    .set opcode_hfi_load, 0x2B
+    .set funct3_hlbu0, 4
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs1 << 15) | (funct3_hlbu0 << 12) | (\rd << 7) | opcode_hfi_load | ((\offset & 0x1F) << 20)
+.endm
+
+.macro hlhu0 rd, offset, rs1
+    .set opcode_hfi_load, 0x2B
+    .set funct3_hlhu0, 5
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs1 << 15) | (funct3_hlhu0 << 12) | (\rd << 7) | opcode_hfi_load | ((\offset & 0x1F) << 20)
+.endm
+
+.macro hlwu0 rd, offset, rs1
+    .set opcode_hfi_load, 0x2B
+    .set funct3_hlwu0, 6
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs1 << 15) | (funct3_hlwu0 << 12) | (\rd << 7) | opcode_hfi_load | ((\offset & 0x1F) << 20)
+.endm
+
+/* External region 0 store instructions */
+.macro hsb0 rs2, offset, rs1
+    .set opcode_hfi_store, 0x5B
+    .set funct3_hsb0, 2
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs2 << 20) | (\rs1 << 15) | (funct3_hsb0 << 12) | ((\offset & 0x1F) << 7) | opcode_hfi_store
+.endm
+
+.macro hsh0 rs2, offset, rs1
+    .set opcode_hfi_store, 0x5B
+    .set funct3_hsh0, 3
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs2 << 20) | (\rs1 << 15) | (funct3_hsh0 << 12) | ((\offset & 0x1F) << 7) | opcode_hfi_store
+.endm
+
+.macro hsw0 rs2, offset, rs1
+    .set opcode_hfi_store, 0x5B
+    .set funct3_hsw0, 4
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs2 << 20) | (\rs1 << 15) | (funct3_hsw0 << 12) | ((\offset & 0x1F) << 7) | opcode_hfi_store
+.endm
+
+.macro hsd0 rs2, offset, rs1
+    .set opcode_hfi_store, 0x5B
+    .set funct3_hsd0, 6
+    .word ((0 & 1) << 31) | ((0 & 0x3F) << 25) | (\rs2 << 20) | (\rs1 << 15) | (funct3_hsd0 << 12) | ((\offset & 0x1F) << 7) | opcode_hfi_store
+.endm
