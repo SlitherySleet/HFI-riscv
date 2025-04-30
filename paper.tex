@@ -464,14 +464,11 @@ This allows it to execute guest programs portably on host systems with different
 QEMU leverages a Just-In-Time (JIT) compiler called Tiny Code Generator (TCG), which translates guest instructions into host instructions.
 This translation layer is extensible and can be used to add functionality to existing instructions or create new instructions.
 Additionally, the state inside the emulated architecture can be modified to add or remove registers and prepare for functional semantics of potential hardware modifications.
+Furthermore, since these modifications can be applied entirely in software, the need for RTL simulation or FPGA synthesis can be avoided, which would be significantly more complex and time-consuming.
 
-Therefore, the RISC-V implementation in QEMU can be modified to add necessary HFI registers and instructions, allowing for validating HFI's ISA semantics and control-flow traps. 
-Moreover, by implementing in QEMU, RISC-V binaries using the created HFI instructions can be verified for functional correctness.
-This allows the validation of memory safety enforcement, instruction semantics, and sandbox behavior across a variety of test workloads.
-
-% TODO Maybe move below about qemu downsides to future work or limitations section
-QEMU lacks support for simulating microarchitectural features such as branch predictors, speculative execution, cache timing, TLB state, and more.
-Moreover, verfiying performance is not possible as QEMU does not have proper features for verifying cycles.
+While QEMU enables validation of functional correctness, it cannot capture microarchitectural vulnerabilities such as Spectre or Meltdown, which depend on speculative execution, out-of-order pipelines, and cache-based side channels. 
+For this reason, QEMU is not suitable for evaluating timing attacks or microarchitectural side effects, but remains a powerful tool for verifying correctness at the architectural level.
+Moreover, verfiying performance is not possible as QEMU lacks features for modeling cycles.
 
 \section{Security/Performance Currently}
 Software-only isolation approaches face significant security challenges. Even robust SFI frameworks, such as those used in browser environments, face challenges from side-channel attacks, especially under cross-sandbox conditions where memory layout or branch predictors leak information.
@@ -488,6 +485,10 @@ Our work brings HFI concepts to the RISC-V ecosystem by adapting the existing HF
 By leveraging RISC-V's custom opcode space, we can integrate the necessary HFI instructions without disrupting compatibility with existing software. Our implementation focuses on providing the essential HFI functionality while maintaining the performance benefits that make hardware-assisted isolation valuable.
 
 Our approach aims to preserve the security guarantees demanded by modern sandboxing frameworks, while also reducing overheads that historically have hindered fine-grained in-process isolation in the RISC-V ecosystem.
+
+Therefore, the RISC-V implementation in QEMU can be modified to add necessary HFI registers and instructions, allowing for validating HFI's ISA semantics and control-flow traps. 
+Moreover, by implementing in QEMU, RISC-V binaries using the created HFI instructions can be verified for functional correctness.
+This allows the validation of memory safety enforcement, instruction semantics, and sandbox behavior across a variety of test workloads.
 
 % TODO add the opcode limitation for explicit regions and possible solutions
 
@@ -548,15 +549,35 @@ The test execution outputs are captured in log files, allowing us to analyze ins
 Through this testing infrastructure, we confirmed the correctness of our implementation across various scenarios including successful sandboxing, proper isolation of memory regions, and correct handling of boundary conditions. The modular nature of our test suite allows us to incrementally validate features as they are implemented and regression-test them as the implementation evolves.
 
 \subsection{Evaluation - wasm2c}
-We wanted to additionally add some of the evaluation done by the original HFI paper. We attempted to modify wasm2c by building on the work done already. The wasm2c code converts wasm files to C source and header and we wanted to modify it to use our modified h-prefix load and store instructions. We were unable to complete this step unfortunately due to some issues with building and running the module. However, this doesn't detract from the implementation of HFI itself. Although it would have been valuable to have used our HFI implementation in wasm2c, our unit tests still comprehensively demonstrate that HFI is feasible and functional in RISC-V. Our implementation is able to achieve the sandboxing functionality we wanted and effectively shows that HFI can extend to other architectures beyond x86. Hence, our work shows the feasibility of HFI in RISC-V and we encourage evaluation similar to that done in the original HFI paper for future work in this area.
+We wanted to additionally add some of the evaluation done by the original HFI paper. We attempted to modify wasm2c by building on the work done already. The wasm2c code converts wasm files to C source and header and we wanted to modify it to use our modified h-prefix load and store instructions. We were unable to complete this step unfortunately due to some issues with building and running the module. However, this doesn't detract from the implementation of HFI itself. Although it would have been valuable to have used our HFI implementation in wasm2c, our unit tests still comprehensively demonstrate that HFI is feasible and functional in RISC-V. Our implementation is able to achieve the sandboxing functionality we wanted and effectively shows that HFI can extend to other architectures beyond x86. Hence, our work sufficiently shows the feasibility of HFI in RISC-V.
 
 \section{Future Work}
 
+\subsection{Utilize the RISC-V HFI in SFI}
+As previously mentioned, a natural next step is to integrate our RISC-V HFI instructions into an existing SFI compiler to validate the correctness of end-to-end sandboxing behavior. 
+This would involve instrumenting memory accesses and control flow in compiler-generated code and replacing them with HFI-enforced operations. 
+Such an integration would demonstrate the correctness of SFI compilers when relying on hardware enforced isolation mechanisms.
+
+% TODO FIX this maybe if u explain earlier
+Additionally, supporting integration of HFI instructions into existing SFI compilers requires certain specification-focused instructions that we did not implement, such as:
+
+\begin{itemize}
+  \item \texttt{hfi\_get\_version}
+  \item \texttt{hfi\_get\_linear\_code\_range\_count}
+  \item \texttt{hfi\_get\_linear\_data\_range\_count}
+  \item \texttt{hfi\_get\_exit\_reason}
+  \item \texttt{hfi\_get\_exit\_location}
+  \item \textit{and more...}
+\end{itemize}
+
+These additional instructions can be added with minimal modification to the \texttt{funct7} field.
+
 \subsection{Cycle Accurate Simulator}
-A more comprehensive implementation for evaluation of security and performance in addition to ISA semantics can be considered in a cycle accurate simulator, such as gem5, as done in the original HFI paper \cite{HFI}. 
-In such an implementation, in addition to functional correctness as in QEMU, resistance to spectre attacks can be evaluated. 
+A more comprehensive implementation for evaluation of security and performance in addition to ISA semantics can be considered in a cycle accurate simulator, such as gem5, as done in the original HFI paper \cite{HFI}.
+Since we used QEMU, an environment where the serialization of \textit{hfi\_enter} and \textit{hfi\_exit} would not produce observable effects, we chose not to implement serialization for Spectre mitigation.
+In contrast, a cycle-accurate simulator enables observation of microarchitectural behavior, allowing for both functional correctness validation and evaluation of speculative execution resistance.
 Moreover, with accurate cycle simulator, the performance overhead for HFI implementation can be validated when utilized within a SFI system.
-As an implementation in a cycle accurate simulator is comparatively much slower in modification of the libraries and execution as compared to QEMU, as a feasibility metric for correctness, an implementation in QEMU was ideal with respect to our circumstances.
+As an implementation in a cycle accurate simulator is comparatively much slower in code modification and execution as compared to QEMU, as a feasibility metric for correctness, an implementation in QEMU was ideal with respect to our circumstances.
 
 \section{Related Work}
 Our work on HFI for RSIC-V builds on prior work that established HFI for x86-64 architectures \cite{HFI}. HFI provides a simple ISA extension to support secure, flexible, and efficient in-process isolation, addressing limitations of existing software-based techniques, including runtime overheads, scalability limits, Spectre vulnerability, and compatibility issues.\\
