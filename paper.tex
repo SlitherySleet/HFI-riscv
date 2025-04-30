@@ -415,37 +415,63 @@ Hardware-assisted fault isolation (HFI) on RISC-V aims to address two critical n
 Several recent high-profile vulnerabilities—such as Heartbleed (CVE-2014-0160) and Spectre (CVE-2017-5753, CVE-2017-5715)—underscore the need for stronger isolation between mutually distrusting code modules. System architects and software developers alike have turned to hardware features for efficient compartmentalization. In this spirit, our HFI design for RISC-V builds on prior work that introduced HFI for x86-64 architectures, enabling fast transitions into and out of "sandbox" contexts while enforcing strong data and control-flow checks.
 
 \section{Background}
-\subsection{SFI stuff?}
-\subsection{HFI}
-Although hardware-based isolation solutions can be integrated at multiple levels, our approach focuses on tightening the security of low-level software runtimes responsible for loading, executing, and managing untrusted or semi-trusted code within the same process. Concretely, existing in-process isolation techniques—such as WebAssembly-based solutions—often rely on software-based guard pages or software fault isolation (SFI). These approaches can impose substantial memory footprints and performance overheads, particularly in tight loops or heavily sandboxed server-side environments. Moreover, software guard pages require complex interactions with the operating system's memory manager (e.g., mprotect calls) that slow down sandbox creation or resizing.
+\subsection{Software-based Fault Isolation}
+Modern applications consistently rely on a large number of various libraries for key functionality, however, this leads to a problem as bugs within these libraries can become a vector of attack for the entire application.
+To mitigate this, it is critical to contain the scope of what each library can access or affect.
+Traditionally, general isolation was considered at the granularity of processes, containers, and virtual machines, which do achieve the functionality of isolation of libraries through hardware-level protection via the MMU and user-kernel privileges.
+Although such these isolation methods are functional, they have significant performance overhead from the context switching and memory management. 
+Due to the fact that the executing libraries are quite small, it motivates isolation that is fine-grained and lightweight.
 
-Recent SFI approaches, including WebAssembly's use of guard regions and JIT-based SFI schemes, have shown that in-process isolation is viable but remains limited by performance bottlenecks and compatibility issues. For instance, large FaaS (Function-as-a-Service) platforms and browser engines isolate tens of thousands of small code modules, resulting in high context-switch overheads or inordinate virtual-address consumption. To address these issues, Hardware-assisted Fault Isolation (HFI)\cite{HFI} was introduced. By consolidating and standardizing architectural support for these needs, HFI reduces reliance on kernel calls, shrinks the required memory footprint, and helps unify existing SFI-based runtimes under a lightweight, hardware-managed sandboxing mechanism.
+These issues are remedied by Software-based Fault Isolation (SFI), which performs isolation in userspace via compiler instrumentation.
+SFI creates a sandbox, which is a restricted execution environment where untrusted code is contained in regards to both memory safety and control-flow integrity.
+Memory accesses are restricted via bounds checks or address masking, while control-flow integrity is maintained by constraining jumps to valid, pre-approved destinations.
+Additionally, to prevent unauthorized interaction with the operating system, system calls from sandboxed code are redirected to a trusted runtime, which will validate and mediate them before execution.
 
+This process of fine-grained isolation within a single address space of the application is referred as \textit{in-process isolation.}
+Recent SFI approaches, including WebAssembly's use of guard regions and JIT-based SFI schemes, have shown that in-process isolation is viable but remains limited by performance bottlenecks and compatibility issues. 
+For instance, large FaaS (Function-as-a-Service) platforms and browser engines isolate tens of thousands of small code modules, resulting in high context-switch overheads or inordinate virtual-address consumption.
+More explicitly, SFI systems face the following limitations:
+\begin{enumerate}
+  \item Performance overhead: SFI implementations can impose significant runtime overhead with over $40\%$ in practical workloads. This stems from the cost of inserting and executing additional instructions for validating memory loads and stores, control-flow validation, and system call interposition. \\
+  \item Limited scalability: SFI schemes rely on allocating large, sparsely-mapped virtual memory regions with guard pages (8 GiB per sandbox in WebAssembly) in order to validate memory with the much more performant masking as opposed to base and bound checks. This consumes vast amounts of virtual address space, making it impractical to host many concurrent sandboxes. \\
+  \item Poor compatibility: SFI requires code to be compiled or transformed in specific ways, which limits its compatibility with unmodified native binaries, low-level system libraries, and code that performs dynamic memory management or emits code at runtime. \\
+  \item Vulnerability to spectre attacks: SFI checks are instrumented as checks within the code and like any other code, modern processors may speculatively execute instructions past these checks, potentially leaking sensitive data through a side channel. 
+\end{enumerate}
+
+Despite these limitations, SFI is increasingly adopted due to its relatively low overhead compared to traditional isolation mechanisms.
+
+\subsection{HFI: Hardware-based Fault Isolation}
+To address the aforementioned limitations found in SFI, Hardware-assisted Fault Isolation (HFI)\cite{HFI} was introduced. By consolidating and standardizing architectural support for these needs, HFI reduces reliance on kernel calls, shrinks the required memory footprint, and helps unify existing SFI-based runtimes under a lightweight, hardware-managed sandboxing mechanism.
+
+Although hardware-based isolation solutions can be integrated at multiple levels, the approach mentioned in \cite{HFI} focuses on tightening the security of low-level software runtimes responsible for loading, executing, and managing untrusted or semi-trusted code within the same process. 
 Hardware-assisted Fault Isolation (HFI) relies on the following core mechanisms:
 \begin{enumerate}
-    \item In-Process Isolation via Regions. The processor tracks a small set of metadata registers—each defining accessible addresses and permissions for code or data. When enabled, any out-of-bounds access or forbidden system call triggers an immediate trap, ensuring robust isolation. These hardware-enforced bounds checks happen in parallel with memory lookups.
-    \item Lightweight Sandbox Mode. A single hfi\_enter instruction enables isolation, while hfi\_exit disables it. Each sandbox can optionally redirect system calls, enabling complete interposition if the sandbox is untrusted. The overhead of enter/exit can be on the order of tens of cycles, much lower than classical kernel-based context switches.
-    \item User-Space Sandbox Configuration. By placing HFI instructions at the user level, ring transitions for memory setup are avoided. This design helps ephemeral tasks or microservices that create and destroy sandboxes frequently, as reconfiguring regions or resizing memory is a matter of writing to hardware registers, not calling into the OS.
-    \item Spectre Mitigations. HFI includes optional serialization on transition instructions, ensuring that speculative execution cannot bypass newly set bounds or leak privileged data outside the sandbox. Additional hardware checks prevent malicious code from polluting caches or branch predictors with secrets from other regions.
+    \item In-Process Isolation via Regions: The processor tracks a small set of metadata registers—each defining accessible addresses and permissions for code or data. When enabled, any out-of-bounds access or forbidden system call triggers an immediate trap, ensuring robust isolation. These hardware-enforced bounds checks happen in parallel with memory lookups. \\
+    \item Lightweight Sandbox Mode: A single hfi\_enter instruction enables isolation, while hfi\_exit disables it. Each sandbox can optionally redirect system calls, enabling complete interposition if the sandbox is untrusted. The overhead of enter/exit can be on the order of tens of cycles, much lower than classical kernel-based context switches. \\
+    \item User-Space Sandbox Configuration: By placing HFI instructions at the user level, ring transitions for memory setup are avoided. This design helps ephemeral tasks or microservices that create and destroy sandboxes frequently, as reconfiguring regions or resizing memory is a matter of writing to hardware registers, not calling into the OS. \\
+    \item Spectre Mitigations: HFI includes optional serialization on transition instructions, ensuring that speculative execution cannot bypass newly set bounds or leak privileged data outside the sandbox. Additional hardware checks prevent malicious code from polluting caches or branch predictors with secrets from other regions. \\
 \end{enumerate}
 
 As demonstrated in prior x86 implementations \cite{HFI}, HFI's hardware cost is kept minimal, and the main processor pipelines remain largely untouched. This ensures that non-sandboxed code experiences negligible slowdowns, while sandboxed code reaps a significant performance advantage compared to purely software-based solutions.
 
-
 \subsection{QEMU}
-The implementation for HFI in RISC-V is being carried out via Quick Emulator (QEMU). 
-QEMU allows for modifying the semantics to add necessary HFI registers and instructions, allowing for validating HFI's ISA semantics and control-flow traps. 
+
+Quick Emulator (QEMU) is a free and open-source emulator for computer processors of varying architecture. 
+QEMU is able to emulate various popular architectures such as x86, ARM, RISC-V, and more.
+The core functionality of emulating various CPU architectures is achieved through \textit{dynamic binary translation}, in which guest machine instructions are converted to equivalent host machine instructions at runtime. 
+This allows it to execute guest programs portably on host systems with different instruction set architectures.
+
+QEMU leverages a Just-In-Time (JIT) compiler called Tiny Code Generator (TCG), which translates guest instructions into host instructions.
+This translation layer is extensible and can be used to add functionality to existing instructions or create new instructions.
+Additionally, the state inside the emulated architecture can be modified to add or remove registers and prepare for functional semantics of potential hardware modifications.
+
+Therefore, the RISC-V implementation in QEMU can be modified to add necessary HFI registers and instructions, allowing for validating HFI's ISA semantics and control-flow traps. 
 Moreover, by implementing in QEMU, RISC-V binaries using the created HFI instructions can be verified for functional correctness.
+This allows the validation of memory safety enforcement, instruction semantics, and sandbox behavior across a variety of test workloads.
 
 % TODO Maybe move below about qemu downsides to future work or limitations section
-Unfortunately, this implementation is not without problems. 
 QEMU lacks support for simulating microarchitectural features such as branch predictors, speculative execution, cache timing, TLB state, and more.
-Therefore, it should be noted that we do implement the serialization on transition instructions to protect against speculative execution outside of the sandbox, an implementation in QEMU will not be able to verify the side-channel resistance. 
-Additionally, verfiying performance is problematic as QEMU does not have proper features for verifying cycles.
-
-A more comprehensive implementation for evaluation of security and performance in addition to ISA semantics can be considered in gem5 as done in the original HFI paper \cite{HFI}. 
-However, such an implementation is comparatively much slower to QEMU in modification of the libraries and execution. 
-Therefore, as a feasibility metric, an implementation in QEMU is ideal in our circumstances.
+Moreover, verfiying performance is not possible as QEMU does not have proper features for verifying cycles.
 
 \section{Security/Performance Currently}
 Software-only isolation approaches face significant security challenges. Even robust SFI frameworks, such as those used in browser environments, face challenges from side-channel attacks, especially under cross-sandbox conditions where memory layout or branch predictors leak information.
@@ -523,6 +549,14 @@ Through this testing infrastructure, we confirmed the correctness of our impleme
 
 \subsection{Evaluation - wasm2c}
 We wanted to additionally add some of the evaluation done by the original HFI paper. We attempted to modify wasm2c by building on the work done already. The wasm2c code converts wasm files to C source and header and we wanted to modify it to use our modified h-prefix load and store instructions. We were unable to complete this step unfortunately due to some issues with building and running the module. However, this doesn't detract from the implementation of HFI itself. Although it would have been valuable to have used our HFI implementation in wasm2c, our unit tests still comprehensively demonstrate that HFI is feasible and functional in RISC-V. Our implementation is able to achieve the sandboxing functionality we wanted and effectively shows that HFI can extend to other architectures beyond x86. Hence, our work shows the feasibility of HFI in RISC-V and we encourage evaluation similar to that done in the original HFI paper for future work in this area.
+
+\section{Future Work}
+
+\subsection{Cycle Accurate Simulator}
+A more comprehensive implementation for evaluation of security and performance in addition to ISA semantics can be considered in a cycle accurate simulator, such as gem5, as done in the original HFI paper \cite{HFI}. 
+In such an implementation, in addition to functional correctness as in QEMU, resistance to spectre attacks can be evaluated. 
+Moreover, with accurate cycle simulator, the performance overhead for HFI implementation can be validated when utilized within a SFI system.
+As an implementation in a cycle accurate simulator is comparatively much slower in modification of the libraries and execution as compared to QEMU, as a feasibility metric for correctness, an implementation in QEMU was ideal with respect to our circumstances.
 
 \section{Related Work}
 Our work on HFI for RSIC-V builds on prior work that established HFI for x86-64 architectures \cite{HFI}. HFI provides a simple ISA extension to support secure, flexible, and efficient in-process isolation, addressing limitations of existing software-based techniques, including runtime overheads, scalability limits, Spectre vulnerability, and compatibility issues.\\
