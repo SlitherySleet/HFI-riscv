@@ -466,10 +466,52 @@ Our approach aims to preserve the security guarantees demanded by modern sandbox
 % TODO add the opcode limitation for explicit regions and possible solutions
 
 \section{Implementation \& Evaluation}
-% TODO dev
+\subsection{Implementation - Intial Setup}
+Since we were implenting our RISC-V HFI extension in QEMU, we cloned the current open-source QEMU repository and began work there. We began by taking time to understand how QEMU works, the purpose of the various repositories, and gaining a better understanding of RISC-V. We worked with the assumption that the system being run on always supports HFI but it is an easy addition to add any necessary hardware checks to validate that assumption.\\
+Our work then began by creating a basic internal register called \textit{hfi\_status}, which serves as a flag bit for verifying whether HFI can be toggled on or off via our newly implemented instructions. Through the use of QEMU logging we display the value of \textit{hfi\_status} and use it as a validator that the instructions have run.
+For our first instruction, we have \textit{hfi\_enter}, which sets \textit{hfi\_status} $=1$ when executed. 
+Additionally, we have \textit{hfi\_exit}, which sets \textit{hfi\_status} $=0$.
+RISC-V contains unmapped opcodes that can be used for the additional of new instructions.
+In order to implement our instruction we have opted to use the CUSTOM0 opcode which is $0001011$.
+We are then able to differentiate between the two functions by modifying the funct3 value of the instructions such that \textit{hfi\_enter} has funct3 $= 000$ and \textit{hfi\_enter} has funct3 $= 001$. Adding the control and status register (CSR) \textit{hfi\_status} and implementing the \textit{hfi\_enter} and \textit{hfi\_exit} gave us basic functionality to enable and disable HFI.\\
 
-To begin, we implemented the \textit{hfi\_enter} and \textit{hfi\_exit} instructions. These enabled and disabled HFI, respectively, by setting a control and status (CSR) register that we added. 
+\subsection{Implementation - Implicit Regions}
+After testing whether we can toggle the \textit{hfi\_status} register properly, we moved on to implement implicit regions. As aforementioned, implicit regions are used for native, unmodified binaries and an important feature of HFI. The original HFI paper had four implicit data regions and two implicit code regions. In our implementation, we supported an arbitrary number of data and code regions which were defined by a global variable that could be adjusted as needed. We also tested using varying numbers of each region and ensured the HFI logic worked seamlessly with the defined number of regions. Implicit regions are defined by a base and a mask.\\
+To store metadata about these regions, we created new structs \textit{HFIImplicitDataRegion} and \textit{HFIImplicitCodeRegion} which we stored in the CPU architecture state in arrays of length based on the number of regions we were supporting. To set these regions, we implemented the instruction \textit{hfi\_set\_region\_size} which took in a region number, base address, and mask and configured a new data or code region accordingly. Then, to set permissions for this region, we added a new instruction \textit{hfi\_set\_region\_permissions} which took a region number and a 64 bit integer encoding the permissions for that region. Since a single call to \textit{hfi\_set\_region\_permissions} will be used for a singular region (differentiated using the code region number), the permission encoding for each of the 3 types of region can also differ. Implicit data regions store the enabled bit at bit 7, read bit at bit 6, and write bit at bit 5. Implicit code regions store the enabled bit at bit 7 and executable bit at bit 6.\\
+Although implicit regions are used for unmodified native binaries, we are still working with the assumption that the software setting up HFI for the binary is a trustable user who will setup the regions properly. However, one check we do insert is for uninitialized regions. Originally, if a region wasn't setup properly where \textit{hfi\_set\_region\_size} wasn't called but \textit{hfi\_set\_region\_permissions} was called, a region would still be configured with $0x0$ for the base and mask. This was an issue as such a region allowed any code/data addresses to pass through. Hence, to prevent this, we set the mask on implicit regions to $0x11111111$ initially which would prevent regions not set up properly to fail HFI checks.\\
+To implement our instruction we have opted to use the CUSTOM0 opcode which is $0001011$.
+We are then able to differentiate between these functions and the two aforementioned functions (\textit{hfi\_enter} and \textit{hfi\_exit}) by modifying the funct3 value of the instructions such that \textit{hfi\_set\_region\_size} has funct3 $= 010$ and \textit{hfi\_set\_region\_permissions} has funct3 $= 011$.
 
+\subsection{Implementation - Explicit Regions}
+Next, we moved on to implement explicit regions by defining a new struct \textit{HFIExpllicitDataRegion} to store metadata about explicit regions. These structs were also stored in a new array in the CPU Architecture State of length based on the global variable indicating the number of regions we wanted to support. While the original HFI paper had the h-prefix \textit{mov} instruct (\textit{hmov}), we had h-prefix load and store instruction. This difference is due to the ISA differences between x86 and RISC-V. Hence, for our implementation, we focused on providing support for a single region and implemented the following instructions: \textit{hlb0}, \textit{hlh0}, \textit{hlw0}, \textit{hlbu0}, \textit{hlhu0}, \textit{hlwu0}, \textit{hld0}, \textit{hsb0}, \textit{hsh0}, \textit{hsw0}, and \textit{hsd0}.\\
+For each of the load and store instructions, we would check the whether both the beginning of the access address and end of the address access fall within a given data region (region 0 for the h-prefix and 0-postfix instructions). If HFI is enabled and the load or store fall within a properly configured region, then the load or store will be allowed through and proceed to load or store the given address by passing on the access addresses to the corresponding non-HFI load or store instruction. If the check fails, HFI would trap and prevent access to the address.\\
+Explicit data regions are configured using a base and a bound. To set these regions, we use the same \textit{hfi\_set\_region\_base} and \textit{hfi\_set\_region\_permissions} that we used for implicit regions. The value passed for a mask in implicit regions was instead used as the bound value when an explicit region was configured. For the permissions, explicit data regions store the enabled bit at bit 7, read bit at bit 6, write bit at bit 5, and large region bit at bit 4.\\
+We tested the implementation using this single explicit data region. One obvious limitation is how we can scale this to work for multiple data regions, which can be a challenge due to the opcode limitation discussed in section 4. However, based on the feasibility of our implementation for the one data region and overall structure of the implementation, we believe our proposed ideas from section 4 can allow easy extension to support more explicit data regions.\\
+For these new load instructions, we used opcode $0001011$. For the new store instructions, we used the opcode $1011011$. You can find the funct3 values we used to differentiate between them in Table~\ref{tab:hfi_instructions}.
+
+\begin{table}[]
+\caption{Encodings of HFI instruction implemented}
+\label{tab:hfi_instructions}
+\begin{tabular}{|l|l|l|}
+\hline
+                                         &  opcode   & funct3   \\ \hline
+\textit{hfi\_enter}                      &  0001011  &  000     \\ \hline
+\textit{hfi\_exit}                       &  0001011  &  001     \\ \hline
+\textit{hfi\_set\_region\_size}          &  0001011  &  010     \\ \hline
+\textit{hfi\_set\_region\_permissions}   &  0001011  &  011     \\ \hline
+\textit{hfi\_hlb0}                       &  0101011  &  000     \\ \hline
+\textit{hfi\_hlh0}                       &  0101011  &  001     \\ \hline
+\textit{hfi\_hlw0}                       &  0101011  &  010     \\ \hline
+\textit{hfi\_hlbu0}                      &  0101011  &  100     \\ \hline
+\textit{hfi\_hlhu0}                      &  0101011  &  101     \\ \hline
+\textit{hfi\_hlwu0}                      &  0101011  &  110     \\ \hline
+\textit{hfi\_hld0}                       &  0101011  &  011     \\ \hline
+\textit{hfi\_hsb0}                       &  1011011  &  010     \\ \hline
+\textit{hfi\_hsh0}                       &  1011011  &  011     \\ \hline
+\textit{hfi\_hsw0}                       &  1011011  &  100     \\ \hline
+\textit{hfi\_hsd0}                       &  1011011  &  000     \\ \hline
+\end{tabular}
+\end{table}
 
 \subsection{Current Progress}
 As of the writing of this paper, we have begun a simple modification to the existing RISC-V implementation in QEMU.
