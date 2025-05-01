@@ -418,7 +418,7 @@ Several recent high-profile vulnerabilities—such as Heartbleed (CVE-2014-0160)
 Modern applications consistently rely on a large number of various libraries for key functionality, however, this leads to a problem as bugs within these libraries can become a vector of attack for the entire application.
 To mitigate this, it is critical to contain the scope of what each library can access or affect.
 Traditionally, general isolation was considered at the granularity of processes, containers, and virtual machines, which do achieve the functionality of isolation of libraries through hardware-level protection via the MMU and user-kernel privileges.
-Although such these isolation methods are functional, they have significant performance overhead from the context switching and memory management. 
+Although these isolation methods are functional, they have significant performance overhead from the context switching and memory management. 
 Due to the fact that the executing libraries are quite small, it motivates isolation that is fine-grained and lightweight.
 
 These issues are remedied by Software-based Fault Isolation (SFI), which performs isolation in userspace via compiler instrumentation.
@@ -610,7 +610,7 @@ For our first instruction, we have \textit{hfi\_enter}, which sets \textit{hfi\_
 Additionally, we have \textit{hfi\_exit}, which sets \textit{hfi\_status} $=0$.
 RISC-V contains unmapped opcodes that can be used for the additional of new instructions.
 In order to implement our instruction we have opted to use the free opcode $0001011$.
-We are then able to differentiate between the two functions by modifying the funct3 value of the instructions such that \textit{hfi\_enter} has funct3 $= 000$ and \textit{hfi\_enter} has funct3 $= 001$. Adding the control and status register (CSR) \textit{hfi\_status} and implementing the \textit{hfi\_enter} and \textit{hfi\_exit} gave us basic functionality to enable and disable HFI.
+We are then able to differentiate between the two functions by modifying the funct3 value of the instructions such that \textit{hfi\_enter} has funct3 $= 000$ and \textit{hfi\_exit} has funct3 $= 001$. Adding the control and status register (CSR) \textit{hfi\_status} and implementing the \textit{hfi\_enter} and \textit{hfi\_exit} gave us basic functionality to enable and disable HFI.
 
 \subsection{Implementation - Implicit Regions}
 After testing whether we can toggle the \textit{hfi\_status} register properly, we moved on to implement implicit regions. As aforementioned, implicit regions are used for native, unmodified binaries and an important feature of HFI. The original HFI paper had four implicit data regions and two implicit code regions. In our implementation, we supported an arbitrary number of data and code regions which were defined by a global variable that could be adjusted as needed. We also tested using varying numbers of each region and ensured the HFI logic worked seamlessly with the defined number of regions. Implicit regions are defined by a base and a mask.
@@ -623,9 +623,9 @@ To implement our instruction we have opted to use the free opcode $0001011$.
 We are then able to differentiate between these functions and the two aforementioned functions (\textit{hfi\_enter} and \textit{hfi\_exit}) by modifying the funct3 value of the instructions such that \textit{hfi\_set\_region\_size} has funct3 $= 010$ and \textit{hfi\_set\_region\_permissions} has funct3 $= 011$.
 
 \subsection{Implementation - Explicit Regions}
-Next, we moved on to implement explicit regions by defining a new struct \textit{HFIExpllicitDataRegion} to store metadata about explicit regions. These structs were also stored in a new array in the CPU Architecture State of length based on the global variable indicating the number of regions we wanted to support. While the original HFI paper had the h-prefix \textit{mov} instruct (\textit{hmov}), we had h-prefix load and store instruction. This difference is due to the ISA differences between x86 and RISC-V. Hence, for our implementation, we focused on providing support for a single region and implemented the following instructions: \textit{hlb0}, \textit{hlh0}, \textit{hlw0}, \textit{hlbu0}, \textit{hlhu0}, \textit{hlwu0}, \textit{hld0}, \textit{hsb0}, \textit{hsh0}, \textit{hsw0}, and \textit{hsd0}.
+Next, we moved on to implement explicit regions by defining a new struct \textit{HFIExplicitDataRegion} to store metadata about explicit regions. These structs were also stored in a new array in the CPU Architecture State of length based on the global variable indicating the number of regions we wanted to support. While the original HFI paper had the h-prefix \textit{mov} instruct (\textit{hmov}), we had h-prefix load and store instruction. This difference is due to the ISA differences between x86 and RISC-V. Hence, for our implementation, we focused on providing support for a single region and implemented the following instructions: \textit{hlb0}, \textit{hlh0}, \textit{hlw0}, \textit{hlbu0}, \textit{hlhu0}, \textit{hlwu0}, \textit{hld0}, \textit{hsb0}, \textit{hsh0}, \textit{hsw0}, and \textit{hsd0}.
 
-For each of the load and store instructions, we would check the whether both the beginning of the access address and end of the address access fall within a given data region (region 0 for the h-prefix and 0-postfix instructions). If HFI is enabled and the load or store fall within a properly configured region, then the load or store will be allowed through and proceed to load or store the given address by passing on the access addresses to the corresponding non-HFI load or store instruction. If the check fails, HFI would trap and prevent access to the address.
+For each of the load and store instructions, we would check whether both the beginning of the access address and end of the address access fall within a given data region (region 0 for the h-prefix and 0-postfix instructions). If HFI is enabled and the load or store fall within a properly configured region, then the load or store will be allowed through and proceed to load or store the given address by passing on the access addresses to the corresponding non-HFI load or store instruction. If the check fails, HFI would trap and prevent access to the address.
 
 Explicit data regions are configured using a base and a bound. To set these regions, we use the same \textit{hfi\_set\_region\_base} and \textit{hfi\_set\_region\_permissions} that we used for implicit regions. The value passed for a mask in implicit regions was instead used as the bound value when an explicit region was configured. For the permissions, explicit data regions store the enabled bit at bit 7, read bit at bit 6, write bit at bit 5, and large region bit at bit 4.
 
@@ -671,13 +671,13 @@ The test execution outputs are captured in log files, allowing us to analyze ins
 Through this testing infrastructure, we confirmed the correctness of our implementation across various scenarios including successful sandboxing, proper isolation of memory regions, and correct handling of boundary conditions. The modular nature of our test suite allows us to incrementally validate features as they are implemented and regression-test them as the implementation evolves.
 
 \subsection{Evaluation - wasm2c}
-We wanted to additionally add some of the evaluation done by the original HFI paper. We attempted to modify wasm2c by building on the work done already. The wasm2c code converts wasm files to C source and header and we wanted to modify it to use our modified h-prefix load and store instructions. We were unable to complete this step unfortunately due to some issues with building and running the module. However, this doesn't detract from the implementation of HFI itself. Although it would have been valuable to have used our HFI implementation in wasm2c, our unit tests still comprehensively demonstrate that HFI is feasible and functional in RISC-V. Our implementation is able to achieve the sandboxing functionality we wanted and effectively shows that HFI can extend to other architectures beyond x86. Hence, our work sufficiently shows the feasibility of HFI in RISC-V.
+We wanted to additionally add some of the evaluation done by the original HFI paper. We attempted to modify wasm2c by building on the work done already. The wasm2c code converts wasm files to C source and header and we wanted to modify it to use our modified h-prefix load and store instructions. Unfortunately, we were unable to complete this due to some issues with building and running the module. However, this doesn't detract from the implementation of HFI itself. Although it would have been valuable to have used our HFI implementation in wasm2c, our unit tests still comprehensively demonstrate that HFI is feasible and functional in RISC-V. Our implementation is able to achieve the sandboxing functionality we wanted and effectively shows that HFI can extend to other architectures beyond x86. Hence, our work sufficiently shows the feasibility of HFI in RISC-V.
 
 \section{Future Work}
 \label{sec:future-work}
 
 \subsection{Expand Number of Explicit Regions}
-Previously mentioned, we currently implemented only a singular explict region with regards to the number of instructions that we would introduce.
+Previously mentioned, we currently implemented only a singular explicit region with regards to the number of instructions that we would introduce.
 In the simplest of implementations, we would just associate a separate instruction for each explicit region, but as we have discussed in Section~\ref{sec:approach}, we only have a finite number of available opcodes.
 
 % TODO: Maybe move
@@ -760,7 +760,7 @@ These additional instructions can be added with minimal modification to the \tex
 A more comprehensive implementation for evaluation of security and performance in addition to ISA semantics can be considered in a cycle accurate simulator, such as gem5, as done in the original HFI paper \cite{HFI}.
 Since we used QEMU, an environment where the serialization of \textit{hfi\_enter} and \textit{hfi\_exit} would not produce observable effects, we chose not to implement serialization for Spectre mitigation.
 In contrast, a cycle-accurate simulator enables observation of microarchitectural behavior, allowing for both functional correctness validation and evaluation of speculative execution resistance.
-Moreover, with accurate cycle simulator, the performance overhead for HFI implementation can be validated when utilized within a SFI system.
+Moreover, with an accurate cycle simulator, the performance overhead for HFI implementation can be validated when utilized within a SFI system.
 As an implementation in a cycle accurate simulator is comparatively much slower in code modification and execution as compared to QEMU, as a feasibility metric for correctness, an implementation in QEMU was ideal with respect to our circumstances.
 
 \section{Related Work}
