@@ -310,7 +310,7 @@
 % http://www.ctan.org/pkg/url
 % Basically, \url{my_url_here}.
 
-
+\usepackage{float}
 
 
 % *** Do not adjust lengths that control margins, column widths, etc. ***
@@ -479,9 +479,13 @@ Beyond security, performance remains a central issue. Current software-based gua
 On RISC-V, these overheads become particularly relevant for microcontroller-class devices—where every cycle matters—and for large-scale data centers wanting to isolate thousands of workloads concurrently. As prior experiments with x86-based HFI show, carefully designed hardware instructions can reduce context-switch time to near that of a function call, while supporting user-space mechanisms for setting up sandbox memory regions. The challenge is thus to replicate and refine these ideas in a clean-slate RISC-V setting without compromising security or drastically altering the instruction set.
 
 \section{Approach}
-Our work brings HFI concepts to the RISC-V ecosystem by adapting the existing HFI design while fitting into RISC-V's existing privileged architecture. RISC-V presents both unique opportunities and challenges for HFI implementation. Its extensible ISA and clean-slate design allow for elegant integration of new instructions, while its simpler microarchitecture requires careful consideration of implementation details.
+\label{sec:approach}
 
-By leveraging RISC-V's custom opcode space, we can integrate the necessary HFI instructions without disrupting compatibility with existing software. Our implementation focuses on providing the essential HFI functionality while maintaining the performance benefits that make hardware-assisted isolation valuable.
+Our work brings HFI concepts to the RISC-V ecosystem by adapting the existing HFI design while fitting into RISC-V's existing privileged architecture. 
+RISC-V presents both unique opportunities and challenges for HFI implementation. Its extensible ISA and clean-slate design allow for elegant integration of new instructions, while its simpler microarchitecture requires careful consideration of implementation details.
+
+By leveraging RISC-V's custom opcode space, we can integrate the necessary HFI instructions without disrupting compatibility with existing software. 
+Our implementation focuses on providing the essential HFI functionality while maintaining the performance benefits that make hardware-assisted isolation valuable.
 
 Our approach aims to preserve the security guarantees demanded by modern sandboxing frameworks, while also reducing overheads that historically have hindered fine-grained in-process isolation in the RISC-V ecosystem.
 
@@ -489,9 +493,88 @@ Therefore, the RISC-V implementation in QEMU can be modified to add necessary HF
 Moreover, by implementing in QEMU, RISC-V binaries using the created HFI instructions can be verified for functional correctness.
 This allows the validation of memory safety enforcement, instruction semantics, and sandbox behavior across a variety of test workloads.
 
+\subsection{Custom Instruction Encoding in RISC-V}
+Before we consider custom instructions, we will first consider the key details of instruction encoding in RISC-V.
+For starters, RISC-V is a fixed instruction length architecture with two variant sizes 16-bit (compressed) and 32-bit.
+For our purposes, we will only need to consider the 32-bit instructions.
+
+% TODO put in better spot
+\begin{table}[H]
+  \centering
+  \caption{RISC-V Instruction Format Encodings}
+  {\fontsize{6.5}{7.5}\selectfont
+  \begin{tabular}{|c|c|c|c|c|c|c|}
+  \hline
+  \textbf{31--25} & \textbf{24--20} & \textbf{19--15} & \textbf{14--12} & \textbf{11--7} & \textbf{6--0} & \textbf{Type} \\
+  \hline
+  \texttt{funct7} & \texttt{rs2} & \texttt{rs1} & \texttt{funct3} & \texttt{rd} & \texttt{opcode} & R-type \\
+  \hline
+  \multicolumn{2}{|c|}{\texttt{imm[11:0]}} & \texttt{rs1} & \texttt{funct3} & \texttt{rd} & \texttt{opcode} & I-type \\
+  \hline
+  \texttt{imm[11:5]} & \texttt{rs2} & \texttt{rs1} & \texttt{funct3} & \texttt{imm[4:0]} & \texttt{opcode} & S-type \\
+  \hline
+  \end{tabular} 
+  }
+  \label{tab:encoding-summary}
+\end{table}
+
+Although Table~\ref{tab:encoding-summary} is not a complete representation of all the types of instructions in RISC-V, it will suffice for our implementation.
+Register-type (R-type) denotes instructions that function entirely on registers such as \textit{add} and \textit{or}.
+Immediate-type (I-type) are instructions that will require an immediate such as \textit{lw} (load word) and \textit{addi}.
+Store-type (S-type) are specified for specifically stores to memory where the immediate is split into two parts; an instruction of this variant is \textit{sw} (store word).
+For our purposes R-type will be utilized for updating and retrieving state of the sandbox such as the size of the implicit regions, base and bound of explicit regions, and their associated permissions.
+I-type and S-type will be in regards to the loads and stores for the explicit regions with the h-prefixed instructions mentioned in Section~\ref{sec:impl-eval}.
+
+In each of these instruction types, certain fields remain consistent, these are the first source register (rs1), the funct3 field, and the opcode. 
+The funct3 and opcode fields are used together to distinguish between specific instructions. 
+The opcode generally defines the broad category of the instruction, while funct3 provides finer-grained differentiation within that category.
+
+\begin{table}[H]
+  \centering
+  \caption{Encoding of RISC-V Load Instructions}
+  \small
+  {
+  \begin{tabular}{|c|c|c|c|c|c|}
+    \hline
+    \textbf{imm} & \textbf{rs1} & \textbf{funct3} & \textbf{rd} & \textbf{opcode} & \textbf{Instruction} \\
+    \hline
+    \texttt{imm[11:0]} & \texttt{rs1} & \texttt{000} & \texttt{rd} & \texttt{0000011} & \texttt{lb} \\
+    \texttt{imm[11:0]} & \texttt{rs1} & \texttt{001} & \texttt{rd} & \texttt{0000011} & \texttt{lh} \\
+    \texttt{imm[11:0]} & \texttt{rs1} & \texttt{010} & \texttt{rd} & \texttt{0000011} & \texttt{lw} \\
+    \texttt{imm[11:0]} & \texttt{rs1} & \texttt{100} & \texttt{rd} & \texttt{0000011} & \texttt{lbu} \\
+    \texttt{imm[11:0]} & \texttt{rs1} & \texttt{101} & \texttt{rd} & \texttt{0000011} & \texttt{lhu} \\
+    \texttt{imm[11:0]} & \texttt{rs1} & \texttt{110} & \texttt{rd} & \texttt{0000011} & \texttt{lwu} \\
+    \texttt{imm[11:0]} & \texttt{rs1} & \texttt{011} & \texttt{rd} & \texttt{0000011} & \texttt{ld} \\
+    \hline
+  \end{tabular}
+  }
+  \label{tab:load-instructions}
+\end{table}
+
+For example, in Table~\ref{tab:load-instructions}, see that their opcode is the same indicating their broad category of load and the funct3 value is varied for the specialized instruction.
+
+Currently, there are 4 opcodes that are available for extending the instruction set; these are custom-0 (0001011), custom-1 (0101011), custom-2 (1011011), and custom-3 (1111011).
+It is important to note that the opcodes custom-2 and custom-3 have been reserved for the open proposal for RV128, which will specify the RISC-V ISA for 128-bit machines. 
+However, these remain available in RV32 and RV64. 
+For simplicity, we will focus our efforts on extending RV64 to ensure no potential conflicts, but modifications should be considered to reduce the number of used opcodes and instructions to maximize compatibility.
+
+In the composition of new instructions that interact with the underlying HFI state using the R-type instructions, we will use the custom-0 instruction.
+Additionally, if we return to Table~\ref{tab:encoding-summary}, we can see that these R-type instructions also have a funct7 value which can be used to further increase the number of instructions with a fixed value for funct3 and opcode. 
+Therefore, further consolidation can be performed for many of the R-type instructions. 
+However, it should be mentioned that in creating instructions to expand functionality such as in Section~\ref{sec:impl-eval}, we did not use this as a focus, and determined this could be determined later.
+As a result, our chosen funct3 and funct7 values can be consolidated within many of our implemented instructions.
+
+Furthermore, it can be seen that loads and stores have little room for expansion with the absence of a funct7 value, and for the explicit region problems arise, which are discussed in Section~\ref{sec:future-work}. 
+
+\subsection{Extending QEMU for HFI}
+
+\subsection{Region Enforcement Semantics}
+
 % TODO add the opcode limitation for explicit regions and possible solutions
 
 \section{Implementation \& Evaluation}
+\label{sec:impl-eval}
+
 \subsection{Implementation - Intial Setup}
 Since we were implenting our RISC-V HFI extension in QEMU, we cloned the current open-source QEMU repository and began work there. We began by taking time to understand how QEMU works, the purpose of the various repositories, and gaining a better understanding of RISC-V. We worked with the assumption that the system being run on always supports HFI but it is an easy addition to add any necessary hardware checks to validate that assumption.
 
@@ -519,7 +602,7 @@ For each of the load and store instructions, we would check the whether both the
 
 Explicit data regions are configured using a base and a bound. To set these regions, we use the same \textit{hfi\_set\_region\_base} and \textit{hfi\_set\_region\_permissions} that we used for implicit regions. The value passed for a mask in implicit regions was instead used as the bound value when an explicit region was configured. For the permissions, explicit data regions store the enabled bit at bit 7, read bit at bit 6, write bit at bit 5, and large region bit at bit 4.
 
-We tested the implementation using this single explicit data region. One obvious limitation is how we can scale this to work for multiple data regions, which can be a challenge due to the opcode limitation discussed in section 4. However, based on the feasibility of our implementation for the one data region and overall structure of the implementation, we believe proposed ideas in section 6 can allow easy extension to support more explicit data regions.
+We tested the implementation using this single explicit data region. One obvious limitation is how we can scale this to work for multiple data regions, which can be a challenge due to the opcode limitation discussed in Section~\ref{sec:approach}. However, based on the feasibility of our implementation for the one data region and overall structure of the implementation, we believe proposed ideas in Section~\ref{sec:future-work} can allow easy extension to support more explicit data regions.
 
 For these new load instructions, we used the free opcode $0001011$. For the new store instructions, we used the free opcode $1011011$. You can find the funct3 values we used to differentiate between them in Table~\ref{tab:hfi_instructions}.
 
@@ -564,15 +647,20 @@ Through this testing infrastructure, we confirmed the correctness of our impleme
 We wanted to additionally add some of the evaluation done by the original HFI paper. We attempted to modify wasm2c by building on the work done already. The wasm2c code converts wasm files to C source and header and we wanted to modify it to use our modified h-prefix load and store instructions. We were unable to complete this step unfortunately due to some issues with building and running the module. However, this doesn't detract from the implementation of HFI itself. Although it would have been valuable to have used our HFI implementation in wasm2c, our unit tests still comprehensively demonstrate that HFI is feasible and functional in RISC-V. Our implementation is able to achieve the sandboxing functionality we wanted and effectively shows that HFI can extend to other architectures beyond x86. Hence, our work sufficiently shows the feasibility of HFI in RISC-V.
 
 \section{Future Work}
+\label{sec:future-work}
+
+\subsection{Expand Number of Explicit Regions}
+Previously mentioned, we currently implemented only a singular explict region with regards to the number of instructions that we would introduce.
+In the simplest of implementations, we would just associate a separate instruction for each explicit region, but as we have discussed in Section~\ref{sec:approach}, we only have a finite number of available opcodes.
 
 % TODO: Maybe move
-\begin{table}[b]
+\begin{table}[H]
   \centering
   \caption{Instruction encoding for \texttt{lw} in RISC-V}
   {\fontsize{6.5}{7.5}\selectfont
   \begin{tabular}{|c|c|c|c|c|}
   \hline
-  \textbf{31--20} & \textbf{19--15} & \textbf{funct3} & \textbf{11--7} & \textbf{OPCODE} \\
+  \textbf{31--20} & \textbf{19--15} & \textbf{funct3} & \textbf{11--7} & \textbf{opcode} \\
   \hline
   \texttt{imm[11:0]} & \texttt{rs1} & \texttt{010} & \texttt{rd} & \texttt{0000011} \\
   \hline
@@ -581,13 +669,13 @@ We wanted to additionally add some of the evaluation done by the original HFI pa
   \label{tab:lw-encoding}
   \end{table}
   
-  \begin{table}[b]
+  \begin{table}[H]
   \centering
   \caption{Instruction encoding for \texttt{sw} in RISC-V}
   {\fontsize{6.5}{7.5}\selectfont
   \begin{tabular}{|c|c|c|c|c|c|}
   \hline
-  \textbf{31--25} & \textbf{24--20} & \textbf{19--15} & \textbf{funct3} & \textbf{11--7} & \textbf{OPCODE} \\
+  \textbf{31--25} & \textbf{24--20} & \textbf{19--15} & \textbf{funct3} & \textbf{11--7} & \textbf{opcode} \\
   \hline
   \texttt{imm[11:5]} & \texttt{rs2} & \texttt{rs1} & \texttt{010} & \texttt{imm[4:0]} & \texttt{0100011} \\
   \hline
@@ -595,10 +683,6 @@ We wanted to additionally add some of the evaluation done by the original HFI pa
   }
   \label{tab:sw-encoding}
   \end{table}
-  
-\subsection{Expand Number of Explicit Regions}
-Previously mentioned, we currently implemented only a singular explict region with regards to the number of instructions that we would introduce.
-In the simplest of implementations, we would just associate a separate instruction for each explicit region, but as we have discussed in section 4, we only have a finite number of opcodes.
 
 Therefore, we need to fit the targeted explicit region number within the load and store instructions we create.
 However, such an observation introduces a larger problem. 
@@ -733,6 +817,9 @@ Performance comparison between models and other simulators We evaluated the perf
 
 \bibitem{Opcode}
 Anon. Adding a custom instruction in the RVI subset. Retrieved March 26, 2025 from https://pcotret.gitlab.io/riscv-custom/adding-custom.htmlcustom-opcodes 
+
+\bibitem{RISCVSpec}
+“V Ratified Specifications.” RISC, riscv.org/specifications/ratified/. Accessed 30 Apr. 2025. 
 
 \end{thebibliography}
 
