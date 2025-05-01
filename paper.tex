@@ -467,7 +467,7 @@ Furthermore, since these modifications can be applied entirely in software, the 
 
 While QEMU enables validation of functional correctness, it cannot capture microarchitectural vulnerabilities such as Spectre or Meltdown, which depend on speculative execution, out-of-order pipelines, and cache-based side channels. 
 For this reason, QEMU is not suitable for evaluating timing attacks or microarchitectural side effects, but remains a powerful tool for verifying correctness at the architectural level.
-Moreover, verfiying performance is not possible as QEMU lacks features for modeling cycles.
+Moreover, verifying performance is not possible as QEMU lacks features for modeling cycles.
 
 \section{Security/Performance Currently}
 Software-only isolation approaches face significant security challenges. Even robust SFI frameworks, such as those used in browser environments, face challenges from side-channel attacks, especially under cross-sandbox conditions where memory layout or branch predictors leak information.
@@ -608,7 +608,7 @@ Since we were implementing our RISC-V HFI extension in QEMU, we cloned the curre
 Our work then began by creating a basic internal register called \textit{hfi\_status}, which serves as a flag bit for verifying whether HFI can be toggled on or off via our newly implemented instructions. Through the use of QEMU logging we display the value of \textit{hfi\_status} and use it as a validator that the instructions have run.
 For our first instruction, we have \textit{hfi\_enter}, which sets \textit{hfi\_status} $=1$ when executed. 
 Additionally, we have \textit{hfi\_exit}, which sets \textit{hfi\_status} $=0$.
-RISC-V contains unmapped opcodes that can be used for the additional of new instructions.
+RISC-V contains unmapped opcodes that can be used for the addition of new instructions.
 In order to implement our instruction we have opted to use the free opcode $0001011$.
 We are then able to differentiate between the two functions by modifying the funct3 value of the instructions such that \textit{hfi\_enter} has funct3 $= 000$ and \textit{hfi\_exit} has funct3 $= 001$. Adding the control and status register (CSR) \textit{hfi\_status} and implementing the \textit{hfi\_enter} and \textit{hfi\_exit} gave us basic functionality to enable and disable HFI.
 
@@ -623,7 +623,7 @@ To implement our instruction we have opted to use the free opcode $0001011$.
 We are then able to differentiate between these functions and the two aforementioned functions (\textit{hfi\_enter} and \textit{hfi\_exit}) by modifying the funct3 value of the instructions such that \textit{hfi\_set\_region\_size} has funct3 $= 010$ and \textit{hfi\_set\_region\_permissions} has funct3 $= 011$.
 
 \subsection{Implementation - Explicit Regions}
-Next, we moved on to implement explicit regions by defining a new struct \textit{HFIExplicitDataRegion} to store metadata about explicit regions. These structs were also stored in a new array in the CPU Architecture State of length based on the global variable indicating the number of regions we wanted to support. While the original HFI paper had the h-prefix \textit{mov} instruct (\textit{hmov}), we had h-prefix load and store instruction. This difference is due to the ISA differences between x86 and RISC-V. Hence, for our implementation, we focused on providing support for a single region and implemented the following instructions: \textit{hlb0}, \textit{hlh0}, \textit{hlw0}, \textit{hlbu0}, \textit{hlhu0}, \textit{hlwu0}, \textit{hld0}, \textit{hsb0}, \textit{hsh0}, \textit{hsw0}, and \textit{hsd0}.
+Next, we moved on to implement explicit regions by defining a new struct \textit{HFIExplicitDataRegion} to store metadata about explicit regions. These structs were also stored in a new array in the CPU Architecture State of length based on the global variable indicating the number of regions we wanted to support. While the original HFI paper had the h-prefix \textit{mov} instruction (\textit{hmov}), we had h-prefix load and store instruction. This difference is due to the ISA differences between x86 and RISC-V. Hence, for our implementation, we focused on providing support for a single region and implemented the following instructions: \textit{hlb0}, \textit{hlh0}, \textit{hlw0}, \textit{hlbu0}, \textit{hlhu0}, \textit{hlwu0}, \textit{hld0}, \textit{hsb0}, \textit{hsh0}, \textit{hsw0}, and \textit{hsd0}.
 
 For each of the load and store instructions, we would check whether both the beginning of the access address and end of the address access fall within a given data region (region 0 for the h-prefix and 0-postfix instructions). If HFI is enabled and the load or store fall within a properly configured region, then the load or store will be allowed through and proceed to load or store the given address by passing on the access addresses to the corresponding non-HFI load or store instruction. If the check fails, HFI would trap and prevent access to the address.
 
@@ -677,7 +677,7 @@ We wanted to additionally add some of the evaluation done by the original HFI pa
 \label{sec:future-work}
 
 \subsection{Expand Number of Explicit Regions}
-Previously mentioned, we currently implemented only a singular explicit region with regards to the number of instructions that we would introduce.
+Previously mentioned, we have currently implemented only a singular explicit region with regards to the number of instructions that we would introduce.
 In the simplest of implementations, we would just associate a separate instruction for each explicit region, but as we have discussed in Section~\ref{sec:approach}, we only have a finite number of available opcodes.
 
 % TODO: Maybe move
@@ -764,7 +764,7 @@ Moreover, with an accurate cycle simulator, the performance overhead for HFI imp
 As an implementation in a cycle accurate simulator is comparatively much slower in code modification and execution as compared to QEMU, as a feasibility metric for correctness, an implementation in QEMU was ideal with respect to our circumstances.
 
 \section{Related Work}
-Our work on HFI for RSIC-V builds on prior work that established HFI for x86-64 architectures \cite{HFI}. HFI provides a simple ISA extension to support secure, flexible, and efficient in-process isolation, addressing limitations of existing software-based techniques, including runtime overheads, scalability limits, Spectre vulnerability, and compatibility issues.
+Our work on HFI for RISC-V builds on prior work that established HFI for x86-64 architectures \cite{HFI}. HFI provides a simple ISA extension to support secure, flexible, and efficient in-process isolation, addressing limitations of existing software-based techniques, including runtime overheads, scalability limits, Spectre vulnerability, and compatibility issues.
 
 There are also several alternate approaches have been developed over the years for fine-grained isolation involving hardware-assisted techniques. Some systems have proposed extensions to the page table metadata to store a per-sandbox ID checked by hardware, such as Donky \cite{Donky} or IMIX \cite{IMIX}. Donky is a hardware-software co-design providing strong in-process isolation based on dynamic memory protection domains using hardware-backed protection keys. Its implementation on RISC-V uses the reserved top 10 bits of page-table entries for protection keys, supporting 1024 keys per process. Donky distinguishes itself by managing protection key policies entirely in userspace via a dedicated control and status register (DKRU). Access to the DKRU is protected by a hardware call gate, which leverages the RISC-V N extension. This architecture provides substantially stronger security guarantees than systems like Intel MPK, where the policy register is unprivileged, allowing Donky to shield against arbitrary code execution without needing binary inspection or rewriting. Donky facilitates fast domain switches entirely in userspace, with minimal hardware additions on RISC-V. Donky has been implemented for both x86 (using MPK emulation) and RISC-V architectures, while IMIX has only been implemented on x86.
 
