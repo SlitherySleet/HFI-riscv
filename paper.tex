@@ -603,7 +603,7 @@ Together, these approaches ensure that region enforcement is always active when 
 \label{sec:impl-eval}
 
 \subsection{Implementation - Intial Setup}
-Since we were implenting our RISC-V HFI extension in QEMU, we cloned the current open-source QEMU repository and began work there. We began by taking time to understand how QEMU works, the purpose of the various repositories, and gaining a better understanding of RISC-V. We worked with the assumption that the system being run on always supports HFI but it is an easy addition to add any necessary hardware checks to validate that assumption.
+Since we were implementing our RISC-V HFI extension in QEMU, we cloned the current open-source QEMU repository and began work there. We began by taking time to understand how QEMU works, the purpose of the various repositories, and gaining a better understanding of RISC-V. We worked with the assumption that the system being run on always supports HFI but it is an easy addition to add any necessary hardware checks to validate that assumption.
 
 Our work then began by creating a basic internal register called \textit{hfi\_status}, which serves as a flag bit for verifying whether HFI can be toggled on or off via our newly implemented instructions. Through the use of QEMU logging we display the value of \textit{hfi\_status} and use it as a validator that the instructions have run.
 For our first instruction, we have \textit{hfi\_enter}, which sets \textit{hfi\_status} $=1$ when executed. 
