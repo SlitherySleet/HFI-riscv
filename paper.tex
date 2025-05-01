@@ -552,6 +552,7 @@ We wanted to additionally add some of the evaluation done by the original HFI pa
 
 \section{Future Work}
 
+% TODO: Maybe move
 \begin{table}[b]
   \centering
   \caption{Instruction encoding for \texttt{lw} in RISC-V}
@@ -593,18 +594,24 @@ Thus, any attempt at adding region information will remove information from some
 For support of two explicit regions, this will require just 1 bit. Likewise, for supporting four explicit regions as in the original HFI \cite{HFI} paper, we will need 2 bits. 
 As a result, we propose two potential solutions in pursuit of supporting four explicit regions.
 
-
-Aligning Accesses: 
-In this case, the 2 bits can be sourced from the immediate with the specification that the added immediate will now have to be a multiple of 4. 
-This works without any worries for the loading and storing of a word (4 bytes) and sizes greater than or equal to 4 bytes, but creates issues when considering half words and byte level modifications.
+\textbf{Aligning Accesses}: 
+In this method, the 2 bits can be sourced from the immediate with the specification that the added immediate will now have to be a multiple of 4. 
+This works without any problems for the loading and storing of a word (4 bytes) and sizes greater than or equal to 4 bytes, but creates issues when considering half words and byte level modifications.
 One possible modification is to also align the halfword accesses to multiples of 2 and have two separate instructions. However, for byte level accesses this is not possible.
 Although this implementation can exclude existing programs that might want to be sandboxed and leverage HFI, in general most code generated from programming languages will be aligned for improved memory access.
 Moreover, any problems that do occur can be solved via compiler modification to modify the unaligned memory accesses to use a combination of byte, halfword, and word versions of the hfi instructions, although this requires substantially more effort.
 
+\textbf{Reducing Available Registers}:
+Here, the 2 bits can be sourced from the indexing of the two registers in the relevant instruction. 
+Registers are input into instructions via a 5 bit value as there are 32 registers in total.
+Therefore, as each of these instructions have two registers in some form (two sources or one source and one destination), 
+we can take a single bit from each of the 5 bits denoting the two registers. 
+This gives us the 2 required bits at the tradeoff of restricting the number of available registers.
+The range of the available registers can additionally be offset or mapped according to a defined set. 
+The use of this method is potentially viable, but more evaluation should be done to verify how problematic register spilling might become.
 
-Reducing Available Registers:
-  
-  
+In reality, a combination of these two methods will probably yield a better result for saving the number of added instructions for new explicit regions.
+Additionally, further evaluation could explore encoding strategies and compiler transformations to better support multiple explicit regions without excessive instruction duplication.
   
 \subsection{Utilize the RISC-V HFI in SFI}
 As previously mentioned, a natural next step is to integrate our RISC-V HFI instructions into an existing SFI compiler to validate the correctness of end-to-end sandboxing behavior. 
