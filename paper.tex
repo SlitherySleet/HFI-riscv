@@ -566,9 +566,32 @@ As a result, our chosen funct3 and funct7 values can be consolidated within many
 
 Furthermore, it can be seen that loads and stores have little room for expansion with the absence of a funct7 value, and for the explicit region problems arise, which are discussed in Section~\ref{sec:future-work}. 
 
-\subsection{Extending QEMU for HFI}
+\subsection{Extending QEMU for HFI: Instructions}
+Upon determining the instruction encoding, decoding the instruction requires modifiying the translation pipeline to recognize the instruction and translate it into the appropriate sequence of TCG operations for execution. This process is structured into three main components:
+
+First, a decode rule must be added in the appropriate instruction format file (e.g., \texttt{insn32.decode}) to match the opcode and instruction fields. This rule identifies the custom instruction and extracts its parameters (such as \texttt{rd}, \texttt{rs1}, \texttt{imm}, etc.).
+
+Second, a corresponding translation function must be defined in the instruction translation file (e.g., \texttt{trans\_hfi.c.inc}). This function is written using QEMU's Tiny Code Generator (TCG) and is responsible for generating the intermediate representation that will be executed by the emulator.
+
+Finally, a helper function may be defined (typically in C) to carry out the instruction's semantic behavior on the CPU. The translation function emits a call to this helper using TCG, and passes in the appropriate virtual CPU state and arguments. This separation allows the architectural logic to be written in C while still integrated into JIT-compiled TCG execution.
+
+This process forms the standard method for implementing new instructions in QEMU, including those used in supporting architectural extensions like HFI.
+
+\subsection{Extending QEMU for HFI: State}
+Modifying the state of QEMU to support the state required for HFI involves extending the architectural state of the RISC-V CPU model to track region metadata and HFI status.
+
+All state must be added to QEMU's \texttt{CPURISCVState} structure, which holds per-core architectural state. This enables extensions such as HFI to be modeled as a first-class architectural feature that can interact with instruction translation and memory access logic.
+
+The added new state is zeroed out on initialization, but modifications are preserved across QEMU execution so that memory checks and instruction semantics can depend on it. 
 
 \subsection{Region Enforcement Semantics}
+Region enforcement in QEMU for HFI can be achieved by emitting TCG-level checks that guard memory accesses when HFI is active. These checks validate that each memory access falls within the appropriate region bounds, either for implicit data/code regions or explicit ones depending on the instruction type.
+
+For standard load and store instructions that operate under implicit region constraints, the necessary bounds checks must be inserted during translation. Specifically, TCG code should be emitted to verify that the computed memory address lies within a configured implicit region before allowing the memory operation to proceed. These checks must always be emitted unconditionally, because QEMU caches translated blocks. If the TCG check were omitted based on the runtime value of the HFI status, the translation block could be cached with a stale value, leading to incorrect execution that bypasses necessary HFI enforcement.
+
+In contrast, HFI-prefixed load and store instructions perform region validation directly in their corresponding C helper functions, which are invoked from TCG. These helpers are written to emit the necessary checks using standard C logic, and since the code is incorporated into TCG, the effect is functionally equivalent to always emitting the inline TCG code as with implcit regions.
+
+Together, these approaches ensure that region enforcement is always active when required and that both implicit and explicit region checks are performed correctly and reliably across QEMU's translated execution model.
 
 % TODO add the opcode limitation for explicit regions and possible solutions
 
