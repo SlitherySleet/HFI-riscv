@@ -478,6 +478,10 @@ Beyond security, performance remains a central issue. Current software-based gua
 
 On RISC-V, these overheads become particularly relevant for microcontroller-class devices—where every cycle matters—and for large-scale data centers wanting to isolate thousands of workloads concurrently. As prior experiments with x86-based HFI show, carefully designed hardware instructions can reduce context-switch time to near that of a function call, while supporting user-space mechanisms for setting up sandbox memory regions. The challenge is thus to replicate and refine these ideas in a clean-slate RISC-V setting without compromising security or drastically altering the instruction set.
 
+Equally important, HFI tackles concrete flaws that consistently slip past software guards. Software-only SFI cannot stop transient-execution attacks such as Spectre (CVE-2017-5753, CVE-2017-5715): an attacker can speculatively jump over the compiler-inserted bounds checks and leak data. Because HFI performs the range comparison inside the load/store pipeline and stalls the access until the check resolves, the classic Spectre gadgets are rendered unexploitable. The same in-pipeline enforcement also neutralises newer variants (e.g., Spectre v4 and Load Value Injection) without utilizing costly lfences throughout the code base.
+
+At the same time, HFI preserves the ability to confine more “traditional” memory-safety bugs, such as out-of-bounds errors, that SFI already blocks—while doing so with better performance. Isolating OpenSSL in an HFI sandbox still prevents the Heartbleed over-read (CVE-2014-0160) from escaping into adjacent heaps, but avoids the 25–35\% overhead that guard-page faults imposed in process-based SFI. Likewise, keeping vulnerable image decoders (e.g., the 2023 libwebp heap overflow) in an HFI region lets a browser switch into and out of the decoder in ~80 ns—about the cost of a function call—rather than launching a heavyweight renderer process. In short, HFI simultaneously closes the speculative side-channels that SFI misses and slashes the overhead of the mitigations SFI already provides.
+
 \section{Approach}
 \label{sec:approach}
 
