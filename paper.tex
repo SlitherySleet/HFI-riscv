@@ -299,8 +299,7 @@
 % The latest version can be found at:
 % http://www.ctan.org/pkg/dblfloatfix
 
-
-
+\usepackage{graphicx}
 
 % *** PDF, URL AND HYPERLINK PACKAGES ***
 %
@@ -513,7 +512,7 @@ We are then able to differentiate between these functions and the two aforementi
 Next, we moved on to implement explicit regions by defining a new struct \textit{HFIExpllicitDataRegion} to store metadata about explicit regions. These structs were also stored in a new array in the CPU Architecture State of length based on the global variable indicating the number of regions we wanted to support. While the original HFI paper had the h-prefix \textit{mov} instruct (\textit{hmov}), we had h-prefix load and store instruction. This difference is due to the ISA differences between x86 and RISC-V. Hence, for our implementation, we focused on providing support for a single region and implemented the following instructions: \textit{hlb0}, \textit{hlh0}, \textit{hlw0}, \textit{hlbu0}, \textit{hlhu0}, \textit{hlwu0}, \textit{hld0}, \textit{hsb0}, \textit{hsh0}, \textit{hsw0}, and \textit{hsd0}.\\
 For each of the load and store instructions, we would check the whether both the beginning of the access address and end of the address access fall within a given data region (region 0 for the h-prefix and 0-postfix instructions). If HFI is enabled and the load or store fall within a properly configured region, then the load or store will be allowed through and proceed to load or store the given address by passing on the access addresses to the corresponding non-HFI load or store instruction. If the check fails, HFI would trap and prevent access to the address.\\
 Explicit data regions are configured using a base and a bound. To set these regions, we use the same \textit{hfi\_set\_region\_base} and \textit{hfi\_set\_region\_permissions} that we used for implicit regions. The value passed for a mask in implicit regions was instead used as the bound value when an explicit region was configured. For the permissions, explicit data regions store the enabled bit at bit 7, read bit at bit 6, write bit at bit 5, and large region bit at bit 4.\\
-We tested the implementation using this single explicit data region. One obvious limitation is how we can scale this to work for multiple data regions, which can be a challenge due to the opcode limitation discussed in section 4. However, based on the feasibility of our implementation for the one data region and overall structure of the implementation, we believe our proposed ideas from section 4 can allow easy extension to support more explicit data regions.\\
+We tested the implementation using this single explicit data region. One obvious limitation is how we can scale this to work for multiple data regions, which can be a challenge due to the opcode limitation discussed in section 4. However, based on the feasibility of our implementation for the one data region and overall structure of the implementation, we believe proposed ideas in section 6 can allow easy extension to support more explicit data regions.\\
 For these new load instructions, we used the free opcode $0001011$. For the new store instructions, we used the free opcode $1011011$. You can find the funct3 values we used to differentiate between them in Table~\ref{tab:hfi_instructions}.
 
 \begin{table}[]
@@ -553,6 +552,60 @@ We wanted to additionally add some of the evaluation done by the original HFI pa
 
 \section{Future Work}
 
+\begin{table}[b]
+  \centering
+  \caption{Instruction encoding for \texttt{lw} in RISC-V}
+  {\fontsize{6.5}{7.5}\selectfont
+  \begin{tabular}{|c|c|c|c|c|}
+  \hline
+  \textbf{31--20} & \textbf{19--15} & \textbf{funct3} & \textbf{11--7} & \textbf{OPCODE} \\
+  \hline
+  \texttt{imm[11:0]} & \texttt{rs1} & \texttt{010} & \texttt{rd} & \texttt{0000011} \\
+  \hline
+  \end{tabular}
+  }
+  \label{tab:lw-encoding}
+  \end{table}
+  
+  \begin{table}[b]
+  \centering
+  \caption{Instruction encoding for \texttt{sw} in RISC-V}
+  {\fontsize{6.5}{7.5}\selectfont
+  \begin{tabular}{|c|c|c|c|c|c|}
+  \hline
+  \textbf{31--25} & \textbf{24--20} & \textbf{19--15} & \textbf{funct3} & \textbf{11--7} & \textbf{OPCODE} \\
+  \hline
+  \texttt{imm[11:5]} & \texttt{rs2} & \texttt{rs1} & \texttt{010} & \texttt{imm[4:0]} & \texttt{0100011} \\
+  \hline
+  \end{tabular} 
+  }
+  \label{tab:sw-encoding}
+  \end{table}
+  
+\subsection{Expand Number of Explicit Regions}
+Previously mentioned, we currently implemented only a singular explict region with regards to the number of instructions that we would introduce.
+In the simplest of implementations, we would just associate a separate instruction for each explicit region, but as we have discussed in section 4, we only have a finite number of opcodes.
+
+Therefore, we need to fit the targeted explicit region number within the load and store instructions we create.
+However, such an observation introduces a larger problem. 
+At closer inspection of the load and store instructions, which are the same as the \texttt{lw} and \texttt{sw} with varying funct3 values, it can be seen that these instructions are extremely tightly packed.
+Thus, any attempt at adding region information will remove information from some other component of the instruction.
+For support of two explicit regions, this will require just 1 bit. Likewise, for supporting four explicit regions as in the original HFI \cite{HFI} paper, we will need 2 bits. 
+As a result, we propose two potential solutions in pursuit of supporting four explicit regions.
+
+
+Aligning Accesses: 
+In this case, the 2 bits can be sourced from the immediate with the specification that the added immediate will now have to be a multiple of 4. 
+This works without any worries for the loading and storing of a word (4 bytes) and sizes greater than or equal to 4 bytes, but creates issues when considering half words and byte level modifications.
+One possible modification is to also align the halfword accesses to multiples of 2 and have two separate instructions. However, for byte level accesses this is not possible.
+Although this implementation can exclude existing programs that might want to be sandboxed and leverage HFI, in general most code generated from programming languages will be aligned for improved memory access.
+Moreover, any problems that do occur can be solved via compiler modification to modify the unaligned memory accesses to use a combination of byte, halfword, and word versions of the hfi instructions, although this requires substantially more effort.
+
+
+Reducing Available Registers:
+  
+  
+  
 \subsection{Utilize the RISC-V HFI in SFI}
 As previously mentioned, a natural next step is to integrate our RISC-V HFI instructions into an existing SFI compiler to validate the correctness of end-to-end sandboxing behavior. 
 This would involve instrumenting memory accesses and control flow in compiler-generated code and replacing them with HFI-enforced operations. 
